@@ -16,6 +16,21 @@ This firmware runs the brushless motor at high currents for maximum torque. This
 
 This code is written to be Arduino-compatible to make it as easy as possible to compile and flash ESCs.
 
+```bash
+mkdir build
+cd build
+cmake ../src/ -i
+```
+
+You will be presented with several options. Change the Arduino directory to match that on your computer. Currently compatible with Arduino < 1.0.
+
+```bash
+cmake ../src/
+make
+```
+
+The makefile is not yet set up to flash through the tgylinker bootloader. Please follow the instructions below to flash.
+
 ##Firmware Flashing
 
 The firmware is normally flashed using the "Turnigy USB Linker" bootloader, which is already present on most ESCs with "SimonK" firmware.
