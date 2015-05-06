@@ -20,6 +20,10 @@ This code is written to be Arduino-compatible to make it as easy as possible to 
 
 The firmware is normally flashed using the "Turnigy USB Linker" bootloader, which is already present on most ESCs with "SimonK" firmware.
 
+```bash
+avrdude -c stk500v2 -b 19200 -P /dev/tty.usbmodemfd131 -p m8 -U flash:w:tripolar.hex:i
+```
+
 ##Concept
 
 The driver operates by electrifying each of the three motor phases in sequence with a phase delay that determines rotational speed.
