@@ -6,7 +6,7 @@ Additionally, there are many applications that require low-speed, high-torque mo
 "Tripolar" aims to achieve the following:
 
 * Provide a low-speed, high-torque driver for three phase brushless motors
-* Long-term, we'd like to blend this control method with traditional back-EMF feedback control to provide smooth control from 0 rpm
+* Long-term, we'd like to blend this control method with traditional back-EMF feedback control to provide smooth control from 0 rpm. (Possibly patented by Bosch. See Hackaday comments on slooowwww BLDC.)
 
 ##Warning - Not For Use With All Motors
 
