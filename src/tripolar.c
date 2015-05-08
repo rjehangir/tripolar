@@ -360,9 +360,9 @@ uint8_t phase;
 	 *																				*/
 	/********************************************************************************/	
 	void loop() {
-		state.pulseWidthA = (pwmSin[currentStepA]-128)*0.6+128;
-		state.pulseWidthB = (pwmSin[currentStepB]-128)*0.6+128;
-		state.pulseWidthC = (pwmSin[currentStepC]-128)*0.6+128;
+		state.pulseWidthA = ((6*(pwmSin[currentStepA]-128))/10) +128;
+		state.pulseWidthB = ((6*(pwmSin[currentStepB]-128))/10) +128;
+		state.pulseWidthC = ((6*(pwmSin[currentStepC]-128))/10) +128;
 
 		if ( forward ) increment = 1;
 		else increment = -1;
