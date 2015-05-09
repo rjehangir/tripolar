@@ -372,14 +372,20 @@ uint8_t phase;
 	 *																				*/
 	/********************************************************************************/	
 	void loop() {
-		static int8_t loopCount = true;
+		static int8_t loopCount = 0;
+		static int32_t rampCount = 0;
+		static int8_t rampValue = 10;
 		
 		processPWM();
 		
 		if (!state.newValue) loopCount++;
-		if (loopCount > 2) 
+		if (loopCount > rampValue) 
 		{
 			loopCount = 0;
+			if (rampCount++ >=10000){
+					if (rampValue > 1) rampValue--;
+					rampCount = 0;
+			}
 			state.pulseWidthA = ((1*(pwmSin[currentStepA]-128))/1) +128;
 			state.pulseWidthB = ((1*(pwmSin[currentStepB]-128))/1) +128;
 			state.pulseWidthC = ((1*(pwmSin[currentStepC]-128))/1) +128;
