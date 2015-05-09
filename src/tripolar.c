@@ -373,7 +373,7 @@ uint8_t phase;
 	/********************************************************************************/	
 	void loop() {
 		static int8_t loopCount = 0;
-		static int32_t rampCount = 0;
+		static int32_t rampCount = 10000;
 		static int8_t rampValue = 0;
 		
 		processPWM();
@@ -382,7 +382,7 @@ uint8_t phase;
 		{
 			loopCount = 0;
 			if (rampCount++ >=10000){
-					if (rampValue >= 0) rampValue--;
+					if (rampValue >= 0) rampValue++;
 					rampCount = 0;
 			}
 			state.pulseBufferA = ((1*(pwmSin[currentStepA]-128))/1) +128;
@@ -390,8 +390,8 @@ uint8_t phase;
 			state.pulseBufferC = ((1*(pwmSin[currentStepC]-128))/1) +128;
 			state.newValue = true;
 						
-			if ( forward ) increment = 1;
-			else increment = -1;
+			if ( forward ) increment = rampValue;
+			else increment = -1*rampValue;
 
 			currentStepA += increment;
 			currentStepB += increment;
