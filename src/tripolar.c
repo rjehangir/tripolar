@@ -336,9 +336,9 @@ THE SOFTWARE.
 		// Set for no prescaler
 		TCCR1B |= _BV(CS10);
 		// Enable timer compare interrupt
-		TIMSK |= _BV(OCIE1A);
+	//	TIMSK |= _BV(OCIE1A);
 		// Clear any pending interrupts
-		TIFR |= _BV(OCF1A);
+   		TIFR |= _BV(OCF1A);
 		
 		
 
@@ -372,11 +372,14 @@ uint8_t phase;
 	 *																				*/
 	/********************************************************************************/	
 	void loop() {
-		//static bool toggle;
+		static int8_t loopCount = true;
 		
 		processPWM();
-		if (!state.newValue)
+		
+		if (!state.newValue) loopCount++;
+		if (loopCount > 2) 
 		{
+			loopCount = 0;
 			state.pulseWidthA = ((1*(pwmSin[currentStepA]-128))/1) +128;
 			state.pulseWidthB = ((1*(pwmSin[currentStepB]-128))/1) +128;
 			state.pulseWidthC = ((1*(pwmSin[currentStepC]-128))/1) +128;
