@@ -66,17 +66,30 @@ THE SOFTWARE.
 		{
 			bool on;					///< When true, indicates that the PWM output is turned on. Currently not used.
 			bool state;					///<Currently  Not Used.
-			uint8_t pulseWidthA;		///PWM Pulse Width for First Motor Phase. Ranges from 0 to 255, where 255 is 100%
-			uint8_t pulseWidthB;		///PWM Pulse Width for Second Motor Phase. Ranges from 0 to 255, where 255 is 100%
-			uint8_t pulseWidthC;		///PWM Pulse Width for Third Motor Phase. Ranges from 0 to 255, where 255 is 100%
+			uint8_t pulseWidthA;		///< PWM Pulse Width for First Motor Phase. Ranges from 0 to 255, where 255 is 100%
+			uint8_t pulseWidthB;		///< See pulseWidthA
+			uint8_t pulseWidthC;		///< See pulseWidthA
+			
+			uint8_t pulseBufferA;		///< Buffered version of pulseWidthA with value to copied to pulseWidthA at begining of PWM cycle
+			uint8_t pulseBufferB;		///< See pulseBufferA
+			uint8_t pulseBufferC;		///< See pulseBufferA
+			
+			bool newValue;				
+				/**< When true, new value has been written to pulseBufferX. Tells ISR to copy new value and Main loop not to calculate
+				 * new PWM */
+			
+			
 		} state_T;
 
 
 
 		
 		/*-----------------------------------------------------------------------------------------------------*/
-		/** @typedef This structure forms the basis for the timer ISR. The idea is that we provide the timer 
-		 *  with a linked list, with each record in the list telling the timer ISR what needs to be done at that 
+		/** @brief
+		 *		This structure is used to create a variable which holds all data for the timer ISR. 
+		 *  @description 
+		 *      The idea is that we provide the timer with a linked list, with each record in the list
+		 *	telling the timer ISR what needs to be done at that 
 		 *  specific time. 
 		 * 
 		 *  This structure was designed to minimize the number of instructions which need to be executed 
@@ -116,9 +129,9 @@ THE SOFTWARE.
 		 *  new values.																							*/
 		typedef struct timerISR_S		  																		
 		{
-			timerScriptEntry_T pCurrentScript;
+			timerScriptEntry_T *pCurrentScript;
 					/**< Pointer to the first record of the timerScript which is currently being run			*/
-			timerScriptEntry_T pNextScript;
+			timerScriptEntry_T *pNextScript;
 					/**< Pointer to the first record of the timerScript which must be run when the current
 					 * script completes execution.																*/
 			timerScriptEntry_T scriptList[2][NUM_SCRIPT_ENTRIES];
@@ -136,6 +149,7 @@ THE SOFTWARE.
 
 	void setup(void);
 	void loop(void);
+	void processPWM(void);
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -215,6 +229,20 @@ THE SOFTWARE.
 		 * three currentStep variable have a precise difference in phases.  */
 	int16_t currentStepB;	//See currentStepA for more information.
 	int16_t currentStepC;	//See currentStepA for more information.
+	
+	
+	int16_t bufferStepA;	
+		/**< Same as currentStepA, but a buffered version we use to hold the value pending completion of
+		 * a PWM cycle at which time we will write the value; */
+	int16_t bufferStepB;	///< See bufferStepA
+	int16_t bufferStepC;	///< See bufferStepA
+	
+	bool newValueReady; 
+		/**< When true. indicates that bufferStepX has a new value. Process PWM will load this into 
+			 currentStepX at the beginning of the PWM cycle. Also, the calculation of the next step 
+			 will be suppressed while this is set to true */
+	
+	
 	int16_t sineArraySize;	
 		/**< This is the size of the pwmSine table and serves to mark the limit for the currentStep
 		 * variables. When they read this value, they will loop around back to 0.						*/
@@ -244,28 +272,7 @@ THE SOFTWARE.
 	/****************************************************************************************************/			
 	ISR(TIMER1_COMPA_vect) 
 	{
-		if ( TCNT2 > 253 ) {
-			// Turn low side back off before turning high side on
-			lowSideOff();
-		}
-
-		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthA+10 ) AnFETOn();
-		// Turn high side on until duty cycle expires
-		if ( TCNT2 < state.pulseWidthA ) { ApFETOn(); AnFETOff(); }
-		else ApFETOff();
-
-		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthB+10 ) BnFETOn();
-		// Turn high side on until duty cycle expires
-		if ( TCNT2 < state.pulseWidthB ) { BpFETOn(); BnFETOff(); }
-		else BpFETOff();
-
-		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthC+10 ) CnFETOn();
-		// Turn high side on until duty cycle expires
-		if ( TCNT2 < state.pulseWidthC ) { CpFETOn(); CnFETOff(); }
-		else CpFETOff();
+		//processPWM();
 	}
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -309,10 +316,13 @@ THE SOFTWARE.
 
 		boardInit();
 
-		// Set up timer two, which we will watch with Timer1 interrupt
-		TCCR2 |= _BV(CS21);
-		TCCR2 |= _BV(CS20);
-		TCCR2 &= ~_BV(CS22);
+		// Set up timer two, which we will watch with Timer1 interrupt 
+		//  001 = no prescaling.
+		//  010 = divide by 8
+		
+		TCCR2 &= ~_BV(CS21);				
+		TCCR2 |= _BV(CS22);
+		TCCR2 &= ~_BV(CS21);
 	
 		// Reset timer
 		TCCR1A = 0;
@@ -329,6 +339,8 @@ THE SOFTWARE.
 		TIMSK |= _BV(OCIE1A);
 		// Clear any pending interrupts
 		TIFR |= _BV(OCF1A);
+		
+		
 
 	
 		sei();
@@ -342,7 +354,7 @@ THE SOFTWARE.
 		sineArraySize--;
 
 		//delay(100);
-		for (int n=0;n<1000;n++)asm("nop");
+		//for (int n=0;n<1000;n++)asm("nop");
 	}
 
 uint8_t phase;
@@ -360,26 +372,68 @@ uint8_t phase;
 	 *																				*/
 	/********************************************************************************/	
 	void loop() {
-		state.pulseWidthA = ((6*(pwmSin[currentStepA]-128))/10) +128;
-		state.pulseWidthB = ((6*(pwmSin[currentStepB]-128))/10) +128;
-		state.pulseWidthC = ((6*(pwmSin[currentStepC]-128))/10) +128;
+		//static bool toggle;
+		
+		processPWM();
+		if (!state.newValue)
+		{
+			state.pulseWidthA = ((1*(pwmSin[currentStepA]-128))/1) +128;
+			state.pulseWidthB = ((1*(pwmSin[currentStepB]-128))/1) +128;
+			state.pulseWidthC = ((1*(pwmSin[currentStepC]-128))/1) +128;
+						
+			if ( forward ) increment = 1;
+			else increment = -1;
 
-		if ( forward ) increment = 1;
-		else increment = -1;
+			currentStepA += increment;
+			currentStepB += increment;
+			currentStepC += increment;
 
-		currentStepA += increment;
-		currentStepB += increment;
-		currentStepC += increment;
+			if (currentStepA>sineArraySize) currentStepA = 0;
+			if (currentStepA<0) currentStepA = sineArraySize;
 
-		if (currentStepA>sineArraySize) currentStepA = 0;
-		if (currentStepA<0) currentStepA = sineArraySize;
+			if (currentStepB>sineArraySize) currentStepB = 0;
+			if (currentStepB<0) currentStepB = sineArraySize;
 
-		if (currentStepB>sineArraySize) currentStepB = 0;
-		if (currentStepB<0) currentStepB = sineArraySize;
-
-		if (currentStepC>sineArraySize) currentStepC = 0;
-		if (currentStepC<0) currentStepC = sineArraySize;
+			if (currentStepC>sineArraySize) currentStepC = 0;
+			if (currentStepC<0) currentStepC = sineArraySize;
+		}
 
 		//delay(0);
+	}
+	
+	
+	
+	void processPWM(void)
+	{
+		if ( TCNT2 > 253 ) {
+			// Turn low side back off before turning high side on			
+			lowSideOff();
+			
+			if (state.newValue) {
+			state.pulseWidthA = state.pulseBufferA;
+			state.pulseWidthB = state.pulseBufferB;			
+			state.pulseWidthC = state.pulseBufferC;
+			state.newValue = false;
+			}			
+		}
+
+		// Turn low side back on after delay
+		if ( TCNT2 > state.pulseWidthA+10 ) AnFETOn();
+		// Turn high side on until duty cycle expires
+		if ( TCNT2 < state.pulseWidthA ) { ApFETOn(); AnFETOff(); }
+		else ApFETOff();
+
+		// Turn low side back on after delay
+		if ( TCNT2 > state.pulseWidthB+10 ) BnFETOn();
+		// Turn high side on until duty cycle expires
+		if ( TCNT2 < state.pulseWidthB ) { BpFETOn(); BnFETOff(); }
+		else BpFETOff();
+
+		// Turn low side back on after delay
+		if ( TCNT2 > state.pulseWidthC+10 ) CnFETOn();
+		// Turn high side on until duty cycle expires
+		if ( TCNT2 < state.pulseWidthC ) { CpFETOn(); CnFETOff(); }
+		else CpFETOff();
+		
 	}
 
