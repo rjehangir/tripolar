@@ -44,6 +44,12 @@ THE SOFTWARE.
 #define NUM_SCRIPT_ENTRIES  6
 /**< The number of script records contained in each timerScript list. */
 
+#define TIMER_FREQ 16000000
+
+#define COIL_RATIO_NUM 50
+#define COIL_RATIO_DEN 7
+	/**< The number of sine cycles each coil needs to go through for motor to 
+	 * make on rotation												 */
 
 
 /*
@@ -150,6 +156,10 @@ THE SOFTWARE.
 	void setup(void);
 	void loop(void);
 	void processPWM(void);
+	
+	inline int16_t rpmToDelay(int16_t rpm) {return (COIL_RATIO_DEN * (uint32_t)TIMER_FREQ) / ((uint32_t)rpm * COIL_RATIO_NUM * 6);}
+		
+	
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -219,7 +229,7 @@ THE SOFTWARE.
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */
 
-	volatile state_T state = {0,0,0,0,0};	
+	volatile state_T state = {0,0,0,0,0,0,0,0,false};	
 	/**< Holds all information used by the timer interrupt service routine. 
 	 * See the declaration of state_T for more information												*/
 
@@ -253,6 +263,10 @@ THE SOFTWARE.
 	bool forward; 
 		/**< Direction control for the motor. If true, the motor goes forward, if false
 		 * the motor goes in reverse.																	*/
+		
+    uint16_t incrementDelay = 16000;
+		/**< The amount of time to wait before incrementing the motor rotor one step. This is 
+		 * the speed control for the motor																*/
 
 
 /*
@@ -330,9 +344,9 @@ THE SOFTWARE.
 		TIMSK = 0;
 		TCNT1 = 0;
 		// Set compare match register to overflow immediately
-		OCR1A = 0;
+		OCR1A = 65535;
 		// Turn on CTC mode for timer 1
-		TCCR1B |= _BV(WGM12);
+	//	TCCR1B |= _BV(WGM12);
 		// Set for no prescaler
 		TCCR1B |= _BV(CS10);
 		// Enable timer compare interrupt
@@ -352,6 +366,10 @@ THE SOFTWARE.
 		currentStepC = currentStepB + phaseShift;
 
 		sineArraySize--;
+		
+		incrementDelay = rpmToDelay(1000);  //Set the motor to 250 RPM
+		
+		incrementRotor();
 
 		//delay(100);
 		//for (int n=0;n<1000;n++)asm("nop");
@@ -375,42 +393,85 @@ uint8_t phase;
 		static int8_t loopCount = 0;
 		static int32_t rampCount = 10000;
 		static int8_t rampValue = 1;
+		static int16_t lastTimer = 0;
+		static int16_t speed = 1000;
 		
-		processPWM();
+		static uint16_t milliSeconds = 0;
+		static uint16_t lastMilliTime = 0;
+		const  uint16_t milliExpire = 16000;
 		
-		if (!state.newValue)
+		static uint16_t lastIncrementTime = 0;
+		
+		
+		static uint16_t lastSpeedChangeTime_ms = 0;
+		static uint16_t speedChangeDelay_ms = 250; 
+		
+		static bool rotorChanged = true;
+			/**< When true, indicates that the rotor position was changed and that we need to update the PWM values. */
+			
+
+		
+		
+		
+		
+		//Update the Milliseconds Timer 
+		if (TCNT1 - lastMilliTime > milliExpire)
 		{
-			loopCount = 0;
-			if (rampCount++ >=10000){
-					if (rampValue >= 0) rampValue++;
-					rampCount = 0;
-			}
+			 milliSeconds++;
+			 lastMilliTime = TCNT1;
+			
+		}
+		
+		if (TCNT1 - lastIncrementTime > incrementDelay)
+		{
+			lastIncrementTime = TCNT1;
+			incrementRotor();			
+		}
+		
+		
+		
+		if (milliSeconds - lastSpeedChangeTime_ms > speedChangeDelay_ms)
+		{		
+			lastSpeedChangeTime_ms = milliSeconds;				
+			incrementDelay = rpmToDelay(speed++);				
+		} 
+
+		//Update the PWM, only if it has completed a cycle and is ready for a new value.
+		if (!state.newValue)
+		{						
 			state.pulseBufferA = ((1*(pwmSin[currentStepA]-128))/1) +128;
 			state.pulseBufferB = ((1*(pwmSin[currentStepB]-128))/1) +128;
 			state.pulseBufferC = ((1*(pwmSin[currentStepC]-128))/1) +128;
-			state.newValue = true;
-						
-			if ( forward ) increment = rampValue;
-			else increment = -1*rampValue;
-
-			currentStepA += increment;
-			currentStepB += increment;
-			currentStepC += increment;
-
-			if (currentStepA>sineArraySize) currentStepA = 0;
-			if (currentStepA<0) currentStepA = sineArraySize;
-
-			if (currentStepB>sineArraySize) currentStepB = 0;
-			if (currentStepB<0) currentStepB = sineArraySize;
-
-			if (currentStepC>sineArraySize) currentStepC = 0;
-			if (currentStepC<0) currentStepC = sineArraySize;
+			state.newValue = true;			
+			rotorChanged = false;						
 		}
+		
+		processPWM();
 
 		//delay(0);
 	}
 	
 	
+	
+	void incrementRotor(void)
+	{
+		
+		if ( forward ) increment = -1;
+		else increment = 1;
+
+		currentStepA += increment;
+		currentStepB += increment;
+		currentStepC += increment;
+
+		if (currentStepA>sineArraySize) currentStepA = 0;
+		if (currentStepA<0) currentStepA = sineArraySize;
+
+		if (currentStepB>sineArraySize) currentStepB = 0;
+		if (currentStepB<0) currentStepB = sineArraySize;
+
+		if (currentStepC>sineArraySize) currentStepC = 0;
+		if (currentStepC<0) currentStepC = sineArraySize;				
+	};
 	
 	void processPWM(void)
 	{
@@ -419,10 +480,10 @@ uint8_t phase;
 			lowSideOff();
 			
 			if (state.newValue) {
-			state.pulseWidthA = state.pulseBufferA;
-			state.pulseWidthB = state.pulseBufferB;			
-			state.pulseWidthC = state.pulseBufferC;
-			state.newValue = false;
+				state.pulseWidthA = state.pulseBufferA;
+				state.pulseWidthB = state.pulseBufferB;			
+				state.pulseWidthC = state.pulseBufferC;
+				state.newValue = false;
 			}			
 		}
 
@@ -445,4 +506,6 @@ uint8_t phase;
 		else CpFETOff();
 		
 	}
+	
+	
 
