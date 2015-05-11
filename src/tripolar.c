@@ -8,7 +8,7 @@ Description: See README.md
 The MIT License (MIT)
 
 Copyright (c) 2015 by Rustom Jehangir, Blue Robotics Inc.
-                      Alan Nise, OceanLab, LLC.
+                      Author #2, Company #2
                       Author #3, Company #3
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -318,11 +318,11 @@ THE SOFTWARE.
 
 		// Set up timer two, which we will watch with Timer1 interrupt 
 		//  001 = no prescaling.
-		//  010 = divide by 8
+				//  010 = divide by 8
 		
-		TCCR2 &= ~_BV(CS21);				
-		TCCR2 |= _BV(CS22);
-		TCCR2 &= ~_BV(CS21);
+		TCCR2 |= _BV(CS20); // make sure CS20 and CS22 are NOT SET
+		TCCR2 |= _BV(CS21); // set CS21 for prescaler of 8
+		TCCR2 &= ~_BV(CS22);		
 	
 		// Reset timer
 		TCCR1A = 0;
@@ -374,7 +374,7 @@ uint8_t phase;
 	void loop() {
 		static int8_t loopCount = 0;
 		static int32_t rampCount = 10000;
-		static int8_t rampValue = 0;
+		static int8_t rampValue = 1;
 		
 		processPWM();
 		
@@ -414,7 +414,7 @@ uint8_t phase;
 	
 	void processPWM(void)
 	{
-		if ( TCNT2 > 253 ) {
+		if ( TCNT2 > 243 ) {
 			// Turn low side back off before turning high side on			
 			lowSideOff();
 			
@@ -427,19 +427,19 @@ uint8_t phase;
 		}
 
 		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthA+10 ) AnFETOn();
+		if ( TCNT2 > state.pulseWidthA+20 ) AnFETOn();
 		// Turn high side on until duty cycle expires
 		if ( TCNT2 < state.pulseWidthA ) { ApFETOn(); AnFETOff(); }
 		else ApFETOff();
 
 		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthB+10 ) BnFETOn();
+		if ( TCNT2 > state.pulseWidthB+20 ) BnFETOn();
 		// Turn high side on until duty cycle expires
 		if ( TCNT2 < state.pulseWidthB ) { BpFETOn(); BnFETOff(); }
 		else BpFETOff();
 
 		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthC+10 ) CnFETOn();
+		if ( TCNT2 > state.pulseWidthC+20 ) CnFETOn();
 		// Turn high side on until duty cycle expires
 		if ( TCNT2 < state.pulseWidthC ) { CpFETOn(); CnFETOff(); }
 		else CpFETOff();
