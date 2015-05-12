@@ -51,7 +51,7 @@ THE SOFTWARE.
 	/**< The number of sine cycles each coil needs to go through for motor to 
 	 * make on rotation												 */
 
-
+#define OFFDELAY 40
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& MACROS
@@ -334,7 +334,7 @@ THE SOFTWARE.
 		//  001 = no prescaling.
 				//  010 = divide by 8
 		
-		TCCR2 |= _BV(CS20); // make sure CS20 and CS22 are NOT SET
+		TCCR2 &= ~_BV(CS20); // make sure CS20 and CS22 are NOT SET
 		TCCR2 |= _BV(CS21); // set CS21 for prescaler of 8
 		TCCR2 &= ~_BV(CS22);		
 	
@@ -367,7 +367,7 @@ THE SOFTWARE.
 
 		sineArraySize--;
 		
-		incrementDelay = rpmToDelay(1000);  //Set the motor to 250 RPM
+		incrementDelay = rpmToDelay(1);  //Set the motor to 250 RPM
 		
 		incrementRotor();
 
@@ -394,7 +394,7 @@ uint8_t phase;
 		static int32_t rampCount = 10000;
 		static int8_t rampValue = 1;
 		static int16_t lastTimer = 0;
-		static int16_t speed = 1000;
+		static int16_t speed = 1;
 		
 		static uint16_t milliSeconds = 0;
 		static uint16_t lastMilliTime = 0;
@@ -404,7 +404,7 @@ uint8_t phase;
 		
 		
 		static uint16_t lastSpeedChangeTime_ms = 0;
-		static uint16_t speedChangeDelay_ms = 250; 
+		static uint16_t speedChangeDelay_ms = 50; 
 		
 		static bool rotorChanged = true;
 			/**< When true, indicates that the rotor position was changed and that we need to update the PWM values. */
@@ -475,7 +475,7 @@ uint8_t phase;
 	
 	void processPWM(void)
 	{
-		if ( TCNT2 > 243 ) {
+		if ( TCNT2 > 255 - OFFDELAY ) {
 			// Turn low side back off before turning high side on			
 			lowSideOff();
 			
@@ -488,19 +488,19 @@ uint8_t phase;
 		}
 
 		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthA+20 ) AnFETOn();
+		if ( TCNT2 > state.pulseWidthA+OFFDELAY ) AnFETOn();
 		// Turn high side on until duty cycle expires
 		if ( TCNT2 < state.pulseWidthA ) { ApFETOn(); AnFETOff(); }
 		else ApFETOff();
 
 		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthB+20 ) BnFETOn();
+		if ( TCNT2 > state.pulseWidthB+OFFDELAY ) BnFETOn();
 		// Turn high side on until duty cycle expires
 		if ( TCNT2 < state.pulseWidthB ) { BpFETOn(); BnFETOff(); }
 		else BpFETOff();
 
 		// Turn low side back on after delay
-		if ( TCNT2 > state.pulseWidthC+20 ) CnFETOn();
+		if ( TCNT2 > state.pulseWidthC+OFFDELAY ) CnFETOn();
 		// Turn high side on until duty cycle expires
 		if ( TCNT2 < state.pulseWidthC ) { CpFETOn(); CnFETOff(); }
 		else CpFETOff();
