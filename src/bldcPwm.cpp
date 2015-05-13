@@ -24,6 +24,7 @@
 #include "afro_nfet.h"
 #include "fets.h"
 #include <avr/io.h>
+#include "bldcPwm.h"
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -32,11 +33,11 @@
 */
 
 
-#define  FET_SWITCH_TIME_CNT (uint16_t)(kFetSwitchTime_uS*(kTimerFreq_Khz/1000)) 
+#define  FET_SWITCH_TIME_CNT (uint16_t)(bldcPwm::kFetSwitchTime_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
 	 /**< kFetSwitchTime_uS converted to timer counts */
-#define  MIN_TIMER_OCR_CNT   (uint16_t)(kMinTimerDelta_uS*(kTimerFreq_Khz/1000)) 
+#define  MIN_TIMER_OCR_CNT   (uint16_t)(bldcPwm::kMinTimerDelta_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
 	 /**< kMinTimerDelta_uS converted to timer counts  */
-#define  PWM_CYCLE_CNT	     (uint16_t)(kTimerFreq_Khz/kPwmFreq_Khz)	
+#define  PWM_CYCLE_CNT	     (uint16_t)(bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
      /**<Number of timer counts in one PWM cycle */
 
 
@@ -53,7 +54,10 @@
 		/** Specifies commands which the pwmISR can execute.
 		 *	In the pwm timer interrupt routine, we define timer expirations, and things to do when 
 		 *  that timer expires. This enumerated type is used to command what happens when that
-		 *  timer expires.																				*/
+		 *  timer expires.			
+		 *  RULE #1 IS: Nobody talks about fight club... just kidding. 
+		 *  RULE #1 IS: The ePwmCommand_OFFx commands must be immediately after their ePwmCommand_OFFx
+		 *			    counterpart for the same channel.	See update method.							*/
 		/************************************************************************************************/		
 			typedef enum pwmCommand_E
 			{
@@ -82,7 +86,8 @@
 				ePwmCommand_END_OF_ENUM 
 					/**< This is used buy the software for determining if a variable of this type holds a valid 
 					 * value.																				*/
-			}pwmCommmand_T;
+			}pwmCommand_T;			
+			
 			
 
 		/************************************************************************************************/
@@ -90,11 +95,11 @@
 		/** This contains information to define a single timer expiration for the pwm ISR. An array
 	     * of this structure is enough to completely describe a pwm cycle.								*/
 		/************************************************************************************************/
-			typedef struct pwmEntry_S
+			typedef volatile struct pwmEntry_S
 			{
-				pwmCommand_T command;  
+				volatile pwmCommand_T command;  
 					/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T	*/
-				int16_t	deltaTime; 
+				volatile int16_t	deltaTime; 
 					/**< What value the timer should be at when this command is executed. This is referenced
 					 * as a delta from the time that the previous command was executed.						*/						
 			}pwmEntry_T;
@@ -114,27 +119,27 @@
 		 * to the ISR. The changeTable variable is used to initiate a table change. isActiveTableA is 
 		 * set by the ISR			 		 															*/
 		/************************************************************************************************/
-			typedef struct pwmIsrData_S
+			typedef volatile struct pwmIsrData_S
 			{
-				pwmEntry_T tableA[8];		
+				volatile pwmEntry_T tableA[8];		
 					/**<table which defines what actions happen at what time during the PWM cycle.			*/
-				pwmEntry_T tableB[8];
+				volatile pwmEntry_T tableB[8];
 					/**< An alternate to table A.															*/
-				bool isActiveTableA;
+				volatile bool isActiveTableA;
 					/**< This indicates which table is being executed by the ISR. When set to true,
 					 *	tableA is being used by the ISR, when false, tableB is. 
 					 *  DEFAULT: true																		*/
-				bool changeTable; 
+				volatile bool changeTable; 
 					/**< This is set to true to instruct the ISR to change tables when starting its
 					 * next PWM cycle. the ISR will set this to false once the table is changed. 
 					 * While this is set to true, neither of the tables should be changed. When it is false
 					 * you may change the non active table (as defined by isActiveTableA)					*/	
-				pwmEntry_T *pEntry;
+				volatile pwmEntry_T *pEntry;
 					/**< Pointer to the current entry in the currently active table. This is used 
 					 * by the ISR to quicky access the table without having to do pointer multiplication
 					 * to find it's position in the current table.			 		
 					 * DEFAULT: tableA[0]																	*/
-				bool enabled; 
+				volatile bool enabled; 
 					/**< When true, the ISR will run, when false, the ISR will return without 
 					 *	doing anything.		
 					 *  DEFAULT: false																		*/
@@ -145,7 +150,7 @@
 &&& STATIC VARIABLES
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */
-	volatile static pwmIsrData_T pwmIsrData;
+	volatile  pwmIsrData_T pwmIsrData;
 		/**< Holds all information used by the pwm  timer interrupt service routine. 
 		 * See the declaration of pwmIsrData_T for more information	 */
 
@@ -213,7 +218,7 @@
 				case ePwmCommand_ALLOFF:
 					lowSideOff();
 					
-					pwmIsrData.pEntry  = (pwmIsrData.isActiveTableA ? pwmIsrEntry.tableA : pwmIsrEntry.tableB);										
+					pwmIsrData.pEntry  = (pwmIsrData.isActiveTableA ? pwmIsrData.tableA : pwmIsrData.tableB);										
 						/* Go to the beginning of the next table */
 					pwmIsrData.changeTable = false;															
 						/* In theory, the user sets changeTable to force a change in the table, in reality
@@ -231,9 +236,10 @@
 			if (pwmIsrData.pEntry->command != ePwmCommand_ALLOFF) pwmIsrData.pEntry++;
 						
 			OCR1A +=  pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-			if (OCR1A - TCNT1 > MIN_TIMER_OCR_CNT) break; //If the expiration time is not too close, then exit ISR		
+			if (OCR1A - TCNT1 > MIN_TIMER_OCR_CNT) break; //If the expiration time is not too close, then exit ISR	
+			while (OCR1A - TCNT1 < 0);	//Otherwise, stay in ISR and wait for the next timer expiration.		
 				
-		} while (OCR1A - TCNT1 < 0)	//Otherwise, stay in ISR and wait for the next timer expiration.	
+		} while(1);
 		
 		//   <========== !!!!!!! CLEAR THE INTERRUPT SOURCE !!!!!!!!
 			
@@ -284,7 +290,7 @@
 		// Set for no prescaler
 		TCCR1B |= _BV(CS10);
 		// Enable timer compare interrupt
-		//	TIMSK |= _BV(OCIE1A);
+		TIMSK |= _BV(OCIE1A);
 		// Clear any pending interrupts
 		TIFR |= _BV(OCF1A);
 		sei();			
@@ -300,7 +306,7 @@
 	****************************************************************************/		
 	void bldcPwm::update(void)
 	{
-		pwmEntry_T *pIsrScriptEntry;   
+		volatile pwmEntry_T *pIsrScriptEntry;   
 			/**< Pointer to the an entry in pwm script table which we are creating.
 			 * We use this point to navigate the table as we populate it. */
 		pwmChannelEntry_T *pPwmChannel;
@@ -317,7 +323,7 @@
 		//---------------------------------------------------------------------------------
 		//FIRST PWM TABLE ENTRY - START COMMAND
 		//---------------------------------------------------------------------------------
-		pIsrScriptEntry  = (pwmIsrData.isActiveTableA ? pwmIsrEntry.tableB : pwmIsrEntry.tableA);	
+		pIsrScriptEntry  = (pwmIsrData.isActiveTableA ? pwmIsrData.tableB : pwmIsrData.tableA);	
 		
 		//Setup First Entry State ePwmCommand_START. (Note this will never change)
 		pIsrScriptEntry->command = ePwmCommand_START;
@@ -330,9 +336,9 @@
 			
 	    /*Reset used flags in the pwmChannel[] array if they were set on a previous run.
 		Using separate instructions is less space than a for loop.		*/
-	    pwmChannel[0].used = false;
-	    pwmChannel[1].used = false;
-	    pwmChannel[2].used = false;
+	    _pwmChannel[0].used = false;
+	    _pwmChannel[1].used = false;
+	    _pwmChannel[2].used = false;
 			
 		
 		//There are 3 entry pairs (turn off high side + turn on low side) 
@@ -344,13 +350,13 @@
 						/**< This variable is used while we attempt to sort the pwmChannel entries. 
 						 * it holds the shortest duty cycle it has found so far as we search the pwmArray. */
 		
-					pPwmChannel = pwmChannel; //Reset c pointer to first entry in pwmChannel array;
+					pPwmChannel = _pwmChannel; //Reset c pointer to first entry in pwmChannel array;
 					
 					//Find "nextPwmIndex" which is the channel with the lowest pulse width not used yet
-					for (uint8_t n = 0;n<ePwmChannel_COUNT;n++)	{						
+					for (uint8_t n = 0; n < ePwmChannel_COUNT;n++)	{						
 						if (pPwmChannel->dutyCycle < shortestDutyCycle && !pPwmChannel->used) {
 							currentPwmIndex = n;
-							shortestDutyCycle = p->dutyCycle;
+							shortestDutyCycle = pPwmChannel->dutyCycle;
 						}
 						pPwmChannel++; //Step to next pwmChannel
 					}
@@ -381,21 +387,21 @@
 					//---------------------------------------------------------------------------------
 					// HIGH SIDE FET OFF ENTRY - TURNING OFF HIGH SIDE FET FOR THIS PWM CHANNEL
 					//---------------------------------------------------------------------------------					
-					pIsrScriptEntry->command = command;
-					pIsrScriptEntry->deltaTime  =  ((uint32_t) c->dutyCycle * PWM_CYCLE_CNT) / PWM_CONTROL_FULL_SCALE_CNTS;
+					pIsrScriptEntry->command = (pwmCommand_T) command;
+					pIsrScriptEntry->deltaTime  =  ((uint32_t) pPwmChannel->dutyCycle * PWM_CYCLE_CNT) / kDutyCycleFullScale;
 										
 					//---------------------------------------------------------------------------------
 					// LOW SIDE FET ON ENTRY - TURN ON LOW SIDE FET FOR THIS CHANNEL
 					//---------------------------------------------------------------------------------
 					pIsrScriptEntry++; //Step to next  ISR script entry.
-					pIsrScriptEntry->command = command + 1; 
+					pIsrScriptEntry->command = (pwmCommand_T)(command + 1); 
 						/* IN enum, the command for turning on low side is always immediately after
 						 * the one for turning off the high side so we can +1 rather than using another
 						 * case statement.*/
 					pIsrScriptEntry->deltaTime = FET_SWITCH_TIME_CNT;
 					
 					
-		} //End For entryPair
+		} //end -  for(entryPair)
 		
 		
 		//---------------------------------------------------------------------------------

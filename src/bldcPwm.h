@@ -71,7 +71,7 @@ class bldcPwm
 			 * method once. The PWM output will not change until this method is called. 
 			/*------------------------------------------------------------------------------------------*/		 
 			
-			inline void set_pwm(pwmChannels_T channel, int16_t value) { pwmChannel[channel].dutyCycle = value);}
+			inline void set_pwm(pwmChannels_T channel, int16_t value) { _pwmChannel[channel].dutyCycle = value;}
 			/**< Used to set the PWM duty cycle for any of the 3 pwm channels. Each channel corresponds to the 
 			 * 3 coils on the brushless DC's motor.
 			 * @param channel
@@ -111,16 +111,16 @@ class bldcPwm
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	*/	private:
 	
-			static pwmChannelEntry_T _pwmChannel[ePwmChannel_COUNT];
+			 pwmChannelEntry_T _pwmChannel[ePwmChannel_COUNT];
 				/**< Holds non ISR data related to controlling the PWM channels. Each element in the array 
 				 * corresponds to a pwm channel as indexed by pwmChannels_T. The user sets each of these element
 				 * to configure the pwm. He then calls setPwmIsr() which will read this data and setup pwmIsrData  */								
 						
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	&&& PRIVATE USER CHANGEABLE CONSTANTS
+	&&&  USER CHANGEABLE CONSTANTS
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	*/	private:	
+	*/	public:	  //Some of these need to be accessed by the ISR, so we need to be public here.
 				
 		static const uint16_t kDutyCycleFullScale = 1023;
 			/**< Upper scale for duty cycle specification. For the set PWM method, this number is the 100% 
