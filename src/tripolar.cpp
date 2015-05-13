@@ -7,6 +7,7 @@
 
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include "bldcPwm.h"
 
 void setup(void);
@@ -32,6 +33,7 @@ void setup(void)
 {
 	motorPwm.begin();
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,512);
+	motorPwm.update();
 }
 
 

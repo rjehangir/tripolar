@@ -19,12 +19,14 @@
 */
 
 #include <avr/io.h>
-#include <avr/interrupt.h>
+
 #include <stdbool.h>
 #include "afro_nfet.h"
 #include "fets.h"
 #include <avr/io.h>
 #include "bldcPwm.h"
+
+#include <avr/interrupt.h>
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -101,7 +103,11 @@
 					/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T	*/
 				volatile int16_t	deltaTime; 
 					/**< What value the timer should be at when this command is executed. This is referenced
-					 * as a delta from the time that the previous command was executed.						*/						
+					 * as a delta from the time that the previous command was executed.						*/	
+				bool waitInISR; 
+					/**<set to true if deltaTime is so small that we risk missing the next ISR.					
+					 * If set to true, the ISR will not exit on the previous entry, and instead,
+					 * wait within the ISR for the next time to occur.										*/
 			}pwmEntry_T;
 		
 		
@@ -119,7 +125,7 @@
 		 * to the ISR. The changeTable variable is used to initiate a table change. isActiveTableA is 
 		 * set by the ISR			 		 															*/
 		/************************************************************************************************/
-			typedef volatile struct pwmIsrData_S
+			typedef  struct pwmIsrData_S
 			{
 				volatile pwmEntry_T tableA[8];		
 					/**<table which defines what actions happen at what time during the PWM cycle.			*/
@@ -134,15 +140,18 @@
 					 * next PWM cycle. the ISR will set this to false once the table is changed. 
 					 * While this is set to true, neither of the tables should be changed. When it is false
 					 * you may change the non active table (as defined by isActiveTableA)					*/	
-				volatile pwmEntry_T *pEntry;
+				 pwmEntry_T *pEntry;
 					/**< Pointer to the current entry in the currently active table. This is used 
 					 * by the ISR to quicky access the table without having to do pointer multiplication
 					 * to find it's position in the current table.			 		
 					 * DEFAULT: tableA[0]																	*/
+				volatile pwmEntry_T *pTableStart;   
+					/**<Pointer to beginning of table the ISR is using. Either tableA or tableB depending 
+					 *  which table the ISR is selected to be using.										*/
 				volatile bool enabled; 
 					/**< When true, the ISR will run, when false, the ISR will return without 
 					 *	doing anything.		
-					 *  DEFAULT: false																		*/
+					 *  DEFAULT: false																		*/				
 			}pwmIsrData_T;
 
 /*
@@ -150,7 +159,7 @@
 &&& STATIC VARIABLES
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */
-	volatile  pwmIsrData_T pwmIsrData;
+	  pwmIsrData_T pwmIsrData;
 		/**< Holds all information used by the pwm  timer interrupt service routine. 
 		 * See the declaration of pwmIsrData_T for more information	 */
 
@@ -188,6 +197,7 @@
 	/****************************************************************************************************/			
 	ISR(TIMER1_COMPA_vect) 
 	{
+		bool incEntry = false; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.
 		if (!pwmIsrData.enabled) return;
 		do {
 			switch (pwmIsrData.pEntry->command)
@@ -196,35 +206,46 @@
 					ApFETOn();
 					BpFETOn();
 					CpFETOn();
+					incEntry = true;
 					break;
 				case ePwmCommand_OFFA:
 					ApFETOff();
+					incEntry = true;
 					break;
 				case ePwmCommand_LOWA:
 					AnFETOn();
+					incEntry = true;
 					break;
 				case ePwmCommand_OFFB:
 					BpFETOff();
+					incEntry = true;
 					break;
 				case ePwmCommand_LOWB:
 					BnFETOn();
+					incEntry = true;
 					break;
 				case ePwmCommand_OFFC:
 					CpFETOff();
+					incEntry = true;
 					break;
 				case ePwmCommand_LOWC:
 					CnFETOn();
+					incEntry = true;
 					break;
 				case ePwmCommand_ALLOFF:
 					lowSideOff();
+					if (pwmIsrData.changeTable == true)  //If user has requested a change of tables then ...
+					{
+						pwmIsrData.pTableStart = (pwmIsrData.isActiveTableA ? pwmIsrData.tableA : pwmIsrData.tableB);										
+							/* Go to the beginning of the next table */
+						pwmIsrData.changeTable = false;															
+							/* In theory, the user sets changeTable to force a change in the table, in reality
+							 * isActiveTableA is enough. However, the user will look at changeTable to see if 
+							 * the change over was made, so that he knows when he can start writing to the 
+							 * free table again. so we reset the flag here.									*/
+					}
+					pwmIsrData.pEntry = pwmIsrData.pTableStart; //Reset script entry to beginning.
 					
-					pwmIsrData.pEntry  = (pwmIsrData.isActiveTableA ? pwmIsrData.tableA : pwmIsrData.tableB);										
-						/* Go to the beginning of the next table */
-					pwmIsrData.changeTable = false;															
-						/* In theory, the user sets changeTable to force a change in the table, in reality
-						 * isActiveTableA is enough. However, the user will look at changeTable to see if 
-						 * the change over was made, so that he knows when he can start writing to the 
-						 * free table again. so we reset the flag here.									*/
 					break;				
 				default:
 					//Something is very wrong, stop processing the ISR
@@ -233,11 +254,11 @@
 			}
 			
 			//If we are on the last command on the PWM sequence, go to beginning of the next table.
-			if (pwmIsrData.pEntry->command != ePwmCommand_ALLOFF) pwmIsrData.pEntry++;
+			if (incEntry) pwmIsrData.pEntry++;
 						
 			OCR1A +=  pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-			if (OCR1A - TCNT1 > MIN_TIMER_OCR_CNT) break; //If the expiration time is not too close, then exit ISR	
-			while (OCR1A - TCNT1 < 0);	//Otherwise, stay in ISR and wait for the next timer expiration.		
+			if (!pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
+			while (OCR1A - TCNT1 < 0) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
 				
 		} while(1);
 		
@@ -263,8 +284,13 @@
 	****************************************************************************/		
 	bldcPwm::bldcPwm(void)
 	{
-		
-	
+		pwmIsrData.pTableStart = pwmIsrData.tableA;
+		pwmIsrData.isActiveTableA = true;
+		pwmIsrData.changeTable = false;
+		pwmIsrData.pEntry =  pwmIsrData.tableA;
+		pwmIsrData.pTableStart = 	 pwmIsrData.tableA;
+		pwmIsrData.enabled = false;
+																	
 	}
 
 
@@ -278,21 +304,24 @@
 	void bldcPwm::begin(void)
 	{
 		cli();
+		//Initialize ISR Data 
+			pwmIsrData.pTableStart = pwmIsrData.tableA;
+			pwmIsrData.isActiveTableA = true;
+			pwmIsrData.changeTable = false;
+			pwmIsrData.pEntry =  pwmIsrData.tableA;
+			pwmIsrData.pTableStart = 	 pwmIsrData.tableA;
+			pwmIsrData.enabled = false;
 		// Reset timer
-		TCCR1A = 0;
-		TCCR1B = 0;
-		TIMSK = 0;
-		TCNT1 = 0;
-		// Set compare match register to overflow immediately
-		OCR1A = 65535;
-		// Turn on CTC mode for timer 1
-		//	TCCR1B |= _BV(WGM12);
-		// Set for no prescaler
-		TCCR1B |= _BV(CS10);
-		// Enable timer compare interrupt
-		TIMSK |= _BV(OCIE1A);
-		// Clear any pending interrupts
-		TIFR |= _BV(OCF1A);
+			TCCR1A = 0;
+			TCCR1B = 0;
+			TIMSK = 0;
+			TCNT1 = 0;
+		
+		OCR1A = 65535;	// Set compare match register to overflow at end of timer cycle	
+		//	TCCR1B |= _BV(WGM12); // Turn on CTC mode for timer 1				
+		TCCR1B |= _BV(CS10); // Set for no prescaler (Timer Freq = 16Mhz)		
+		TIMSK |= _BV(OCIE1A); // Enable timer compare interrupt		
+		TIFR |= _BV(OCF1A); // Clear any pending interrupts
 		sei();			
 	}
 
