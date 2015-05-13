@@ -39,6 +39,116 @@
 #define  PWM_CYCLE_CNT	     (uint16_t)(kTimerFreq_Khz/kPwmFreq_Khz)	
      /**<Number of timer counts in one PWM cycle */
 
+
+
+
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& STRUCTURES
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/
+
+		/************************************************************************************************/
+		/* ENUM: pwmCommand_E																			*/
+		/** Specifies commands which the pwmISR can execute.
+		 *	In the pwm timer interrupt routine, we define timer expirations, and things to do when 
+		 *  that timer expires. This enumerated type is used to command what happens when that
+		 *  timer expires.																				*/
+		/************************************************************************************************/		
+			typedef enum pwmCommand_E
+			{
+				ePwmCommand_START,	
+					/**<Start of the PWM Cycle. All channels are switch to high side to start the pulse width.
+					 *  (high side  A,B,C = on, low side A,B,C = off )										*/
+				ePwmCommand_OFFA,		
+					/**< The PWM on period has ended for channel A has expired. Turn off the high side fet
+	 				 *  so that both the high and the low side FET has are off, allowing time for the high 
+					 *  side FET to turn off.
+					 *  (Channel A - FET_HIGH = OFF, FET_LOW = OFF)											*/
+				ePwmCommand_LOWA,
+					/**< Assuming that the high side FET was successfully turned off, and the high side FET
+					 * was allowed time to settle to the off position, we will now turn on the low side FET 
+					 * of the h-bridge for channel A.
+					 *  (Channel A - FET_HIGH = OFF, FET_LOW = ON)											*/
+				ePwmCommand_OFFB, 	///< See eTimerCommand_OFFA. (Channel B - FET_HIGH = OFF, FET_LOW = OFF)
+				ePwmCommand_LOWB,	    ///< See eTimerCommand_LOWA	 (Channel B - FET_HIGH = OFF, FET_LOW = ON)
+				ePwmCommand_OFFC,		///< See eTimerCommand_OFFA. (Channel C - FET_HIGH = OFF, FET_LOW = OFF)
+				ePwmCommand_LOWC,     ///< See eTimerCommand_LOWA	 (Channel C - FET_HIGH = OFF, FET_LOW = ON)
+				ePwmCommand_ALLOFF,   
+					/**< The PWM cycle has completed, We will turn off all fets on all channels. There will be 
+					 *  a time delay between now, and eTimerCommand_START which will allow time for the FETs
+					 *  to respond to being shutoff, before turning back on again.
+					 *   (high side  A,B,C = OFF, low side A,B,C = OFF )									*/
+				ePwmCommand_END_OF_ENUM 
+					/**< This is used buy the software for determining if a variable of this type holds a valid 
+					 * value.																				*/
+			}pwmCommmand_T;
+			
+
+		/************************************************************************************************/
+		/* STRUCT: pwmEntry_S																			*/
+		/** This contains information to define a single timer expiration for the pwm ISR. An array
+	     * of this structure is enough to completely describe a pwm cycle.								*/
+		/************************************************************************************************/
+			typedef struct pwmEntry_S
+			{
+				pwmCommand_T command;  
+					/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T	*/
+				int16_t	deltaTime; 
+					/**< What value the timer should be at when this command is executed. This is referenced
+					 * as a delta from the time that the previous command was executed.						*/						
+			}pwmEntry_T;
+		
+		
+		
+		
+		/************************************************************************************************/
+		/* STRUCT: pwmIsrData_S																			*/	
+		/**< A variable of this type holds all data used by the pwm interrupt service routine. 
+		 * This is used to both hold the data. Some members of this structure are changed outside the 
+		 * ISR and serve as a means of controlling the ISR's behavior.									
+		 *
+		 * There are 2 tables. Each table defines the PWM cycle. While one of these tables is being 
+		 * executed by the ISR, the second table is free to be loaded with information for a new PWM 
+		 * cycle. the isActiveTableA member is used to indicate which of these 2 tables is assigned 
+		 * to the ISR. The changeTable variable is used to initiate a table change. isActiveTableA is 
+		 * set by the ISR			 		 															*/
+		/************************************************************************************************/
+			typedef struct pwmIsrData_S
+			{
+				pwmEntry_T tableA[8];		
+					/**<table which defines what actions happen at what time during the PWM cycle.			*/
+				pwmEntry_T tableB[8];
+					/**< An alternate to table A.															*/
+				bool isActiveTableA;
+					/**< This indicates which table is being executed by the ISR. When set to true,
+					 *	tableA is being used by the ISR, when false, tableB is. 
+					 *  DEFAULT: true																		*/
+				bool changeTable; 
+					/**< This is set to true to instruct the ISR to change tables when starting its
+					 * next PWM cycle. the ISR will set this to false once the table is changed. 
+					 * While this is set to true, neither of the tables should be changed. When it is false
+					 * you may change the non active table (as defined by isActiveTableA)					*/	
+				pwmEntry_T *pEntry;
+					/**< Pointer to the current entry in the currently active table. This is used 
+					 * by the ISR to quicky access the table without having to do pointer multiplication
+					 * to find it's position in the current table.			 		
+					 * DEFAULT: tableA[0]																	*/
+				bool enabled; 
+					/**< When true, the ISR will run, when false, the ISR will return without 
+					 *	doing anything.		
+					 *  DEFAULT: false																		*/
+			}pwmIsrData_T;
+
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& STATIC VARIABLES
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/
+	volatile static pwmIsrData_T pwmIsrData;
+		/**< Holds all information used by the pwm  timer interrupt service routine. 
+		 * See the declaration of pwmIsrData_T for more information	 */
+
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& INTERRUPT SERVICE ROUTINES
