@@ -45,6 +45,48 @@ class bldcPwm
 				ePwmChannel_COUNT					
 			}pwmChannels_T;	
 
+
+		/************************************************************************************************/
+		/* ENUM: pwmCommand_E																			*/
+		/** Specifies commands which the pwmISR can execute.
+		 *	In the pwm timer interrupt routine, we define timer expirations, and things to do when 
+		 *  that timer expires. This enumerated type is used to command what happens when that
+		 *  timer expires.			
+		 *  RULE #1 IS: Nobody talks about fight club... just kidding. 
+		 *  RULE #1 IS: The ePwmCommand_OFFx commands must be immediately after their ePwmCommand_OFFx
+		 *			    counterpart for the same channel.	See update method.							*/
+		/************************************************************************************************/		
+			typedef enum pwmCommand_E
+			{
+				ePwmCommand_START,	
+					/**<Start of the PWM Cycle. All channels are switch to high side to start the pulse width.
+					 *  (high side  A,B,C = on, low side A,B,C = off )										*/
+				ePwmCommand_OFFA,		
+					/**< The PWM on period has ended for channel A has expired. Turn off the high side fet
+	 				 *  so that both the high and the low side FET has are off, allowing time for the high 
+					 *  side FET to turn off.
+					 *  (Channel A - FET_HIGH = OFF, FET_LOW = OFF)											*/
+				ePwmCommand_LOWA,
+					/**< Assuming that the high side FET was successfully turned off, and the high side FET
+					 * was allowed time to settle to the off position, we will now turn on the low side FET 
+					 * of the h-bridge for channel A.
+					 *  (Channel A - FET_HIGH = OFF, FET_LOW = ON)											*/
+				ePwmCommand_OFFB, 	///< See eTimerCommand_OFFA. (Channel B - FET_HIGH = OFF, FET_LOW = OFF)
+				ePwmCommand_LOWB,	    ///< See eTimerCommand_LOWA	 (Channel B - FET_HIGH = OFF, FET_LOW = ON)
+				ePwmCommand_OFFC,		///< See eTimerCommand_OFFA. (Channel C - FET_HIGH = OFF, FET_LOW = OFF)
+				ePwmCommand_LOWC,     ///< See eTimerCommand_LOWA	 (Channel C - FET_HIGH = OFF, FET_LOW = ON)
+				ePwmCommand_ALLOFF,   
+					/**< The PWM cycle has completed, We will turn off all fets on all channels. There will be 
+					 *  a time delay between now, and eTimerCommand_START which will allow time for the FETs
+					 *  to respond to being shutoff, before turning back on again.
+					 *   (high side  A,B,C = OFF, low side A,B,C = OFF )									*/
+				ePwmCommand_END_OF_ENUM 
+					/**< This is used buy the software for determining if a variable of this type holds a valid 
+					 * value.																				*/
+			}pwmCommand_T;			
+			
+			
+
 		
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -89,29 +131,52 @@ class bldcPwm
    		    /*------------------------------------------------------------------------------------------*/
 			 
 
-/*
+	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	&&& PRIVATE STRUCTURE DEFINITIONS
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	*/ private:
-
+								
 		
-
-		
-		/************************************************************************************************/
-		/* STRUCT: pwmChannelEntry_S																	*/
-		/**<																							*/	
-		/************************************************************************************************/
+			/************************************************************************************************/
+			/* STRUCT: pwmChannelEntry_S																	*/
+			/**<	Used to hold the PWM Duty cycle for each pwm channel. In addition to storage
+			 * of the PWM value itself, it includes additional members which assist during the 
+			 * processing of these values into the ISR data structure				   						*/	
+			/************************************************************************************************/
 			typedef struct pwmChannelEntry_S
 			{
 				uint16_t dutyCycle; 
 					/**< PWM Duty Cycle for Channel. Range is from 0 to PWM_CONTROL_FULL_SCALE_CNTS
-					 * where a value of PWM_CONTROL_FULL_SCALE_CNTS indicates 100% pulse width.				*/
+						* where a value of PWM_CONTROL_FULL_SCALE_CNTS indicates 100% pulse width.				*/
 				bool used; 
 					/**< This is used during sorting to indicate whether this entry was already already
-					 * used on a previous sort so that we dont reuse the entry on the next sort.			*/			
+						* used on a previous sort so that we dont reuse the entry on the next sort.			*/			
 			}pwmChannelEntry_T;								 
-		
+			
+			
+			/************************************************************************************************/
+			/* STRUCT: pwmSortList_S  																	*/
+			/**<	Holds an entry for the preliminary list of pwm timer events. Includes 
+			 * additional members to assist with the sorting processes.										*/
+			/************************************************************************************************/
+			typedef struct pwmSortList_S
+			{
+				pwmCommand_T command;  
+					/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T	*/
+				uint16_t absoluteCount; 
+					/**< The time from the start of the PWM cycle that the event is supposed to take place
+						* measured in timer counts. This is different from the deltaTime used in pwmEntry_S
+						* in that it is absolute time, rather than a delta from the previous event.			*/
+				int8_t nextIndex;
+					/**< This is used for sorting of the list, it is the array index of the entry which 
+						* is next in the sort order. -1 Indicates its the last entry in list.															*/								
+			}pwmSortList_T;
+					
+					
+					
+
+	
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	&&& PRIVATE PROPERTIES
