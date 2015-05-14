@@ -25,6 +25,8 @@
 #include "fets.h"
 #include <avr/io.h>
 #include "bldcPwm.h"
+#include <string.h>
+
 
 #include <avr/interrupt.h>
 
@@ -39,7 +41,7 @@
 	 /**< kFetSwitchTime_uS converted to timer counts */
 #define  MIN_TIMER_OCR_CNT   (uint16_t)(bldcPwm::kMinTimerDelta_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
 	 /**< kMinTimerDelta_uS converted to timer counts  */
-#define  PWM_CYCLE_CNT	     (uint16_t)(bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
+#define  PWM_CYCLE_CNT	     (bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
      /**<Number of timer counts in one PWM cycle */
 
 
@@ -101,7 +103,7 @@
 			{
 				volatile pwmCommand_T command;  
 					/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T	*/
-				volatile int16_t	deltaTime; 
+				volatile uint16_t	deltaTime; 
 					/**< What value the timer should be at when this command is executed. This is referenced
 					 * as a delta from the time that the previous command was executed.						*/	
 				bool waitInISR; 
@@ -151,7 +153,8 @@
 				volatile bool enabled; 
 					/**< When true, the ISR will run, when false, the ISR will return without 
 					 *	doing anything.		
-					 *  DEFAULT: false																		*/				
+					 *  DEFAULT: false																		*/		
+				uint16_t startTime; //Timer value when 		
 			}pwmIsrData_T;
 
 /*
@@ -162,6 +165,7 @@
 	  pwmIsrData_T pwmIsrData;
 		/**< Holds all information used by the pwm  timer interrupt service routine. 
 		 * See the declaration of pwmIsrData_T for more information	 */
+	  pwmEntry_T IsrCurrentEntry;
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -197,7 +201,7 @@
 	/****************************************************************************************************/			
 	ISR(TIMER1_COMPA_vect) 
 	{
-		bool incEntry = false; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.
+		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.
 		if (!pwmIsrData.enabled) return;
 		do {
 			switch (pwmIsrData.pEntry->command)
@@ -245,7 +249,7 @@
 							 * free table again. so we reset the flag here.									*/
 					}
 					pwmIsrData.pEntry = pwmIsrData.pTableStart; //Reset script entry to beginning.
-					
+					incEntry = false; //Don't increment entry because we just sent entry to beginning instead.
 					break;				
 				default:
 					//Something is very wrong, stop processing the ISR
@@ -253,12 +257,14 @@
 					break;					
 			}
 			
-			//If we are on the last command on the PWM sequence, go to beginning of the next table.
+			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
-						
-			OCR1A +=  pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-			if (!pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
-			while (OCR1A - TCNT1 < 0) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
+			
+			TIFR |= _BV(OCF1A); // Clear any pending interrupts 	
+			OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
+			if (! pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
+
+			while (TCNT1 < pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
 				
 		} while(1);
 		
@@ -288,9 +294,11 @@
 		pwmIsrData.isActiveTableA = true;
 		pwmIsrData.changeTable = false;
 		pwmIsrData.pEntry =  pwmIsrData.tableA;
-		pwmIsrData.pTableStart = 	 pwmIsrData.tableA;
+		pwmIsrData.pTableStart = pwmIsrData.tableA;
 		pwmIsrData.enabled = false;
-																	
+		
+		for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;
+																					
 	}
 
 
@@ -311,17 +319,25 @@
 			pwmIsrData.pEntry =  pwmIsrData.tableA;
 			pwmIsrData.pTableStart = 	 pwmIsrData.tableA;
 			pwmIsrData.enabled = false;
+			
+		update();  //Initialize the pwmIsrData.table
+		
 		// Reset timer
 			TCCR1A = 0;
 			TCCR1B = 0;
 			TIMSK = 0;
 			TCNT1 = 0;
 		
-		OCR1A = 65535;	// Set compare match register to overflow at end of timer cycle	
-		//	TCCR1B |= _BV(WGM12); // Turn on CTC mode for timer 1				
+		OCR1A = 100*kTimerFreq_Khz;	
+			/* Set compare match register to overflow at 100ms, which means 
+			   the PWM will have its first interrupt in 100ms..
+			   Which means PWM starts in 100ms		*/
+		TCCR1B |= _BV(WGM12); // Turn on CTC mode for timer 1				
 		TCCR1B |= _BV(CS10); // Set for no prescaler (Timer Freq = 16Mhz)		
 		TIMSK |= _BV(OCIE1A); // Enable timer compare interrupt		
 		TIFR |= _BV(OCF1A); // Clear any pending interrupts
+		
+		pwmIsrData.enabled = true;
 		sei();			
 	}
 
@@ -348,6 +364,12 @@
 		uint8_t command; 
 			/**< Buffer the value from the switch so we can set set it after - 
 			 * doing the more setting through pointer only once */
+		uint16_t totalDelay = 0; 
+			/**<The total delay since the beginning of the PWM CYCLE for all ISR Script
+			 * entries encued so far - excluding the START delay (which is really applied to
+			 * the end of the previous cycle. This is used to help calculate the deltaTime for
+			 * ePwmCommand_ALLOFF. */
+		  
 		
 		//---------------------------------------------------------------------------------
 		//FIRST PWM TABLE ENTRY - START COMMAND
@@ -357,6 +379,7 @@
 		//Setup First Entry State ePwmCommand_START. (Note this will never change)
 		pIsrScriptEntry->command = ePwmCommand_START;
 		pIsrScriptEntry->deltaTime = FET_SWITCH_TIME_CNT;
+		pIsrScriptEntry->waitInISR = true; //Tell ISR to wait because deltaTime is so small
 				
 		//---------------------------------------------------------------------------------
 		//SIX MORE TABLE ENTRIES - TURNING OFF EACH FET AT END OF ITS PWM DUTY CYCLE
@@ -390,6 +413,7 @@
 						pPwmChannel++; //Step to next pwmChannel
 					}
 					
+					pPwmChannel = &_pwmChannel[currentPwmIndex]; //Reset the pointer to the entry we found above
 					pPwmChannel->used = true; 
 						/* Indicate we already used this pwmChannel index so that we ignore it
 						 * when we search for the next entry. */
@@ -415,9 +439,13 @@
 					
 					//---------------------------------------------------------------------------------
 					// HIGH SIDE FET OFF ENTRY - TURNING OFF HIGH SIDE FET FOR THIS PWM CHANNEL
-					//---------------------------------------------------------------------------------					
+					//---------------------------------------------------------------------------------	
+					pIsrScriptEntry++; //Go to next entry				
 					pIsrScriptEntry->command = (pwmCommand_T) command;
-					pIsrScriptEntry->deltaTime  =  ((uint32_t) pPwmChannel->dutyCycle * PWM_CYCLE_CNT) / kDutyCycleFullScale;
+					pIsrScriptEntry->deltaTime  =  (((uint32_t) pPwmChannel->dutyCycle * PWM_CYCLE_CNT) / kDutyCycleFullScale) - totalDelay;
+					if (pIsrScriptEntry->deltaTime < MIN_TIMER_OCR_CNT) pIsrScriptEntry->waitInISR = true; 
+						/* Tell ISR not to exit if the deltaTime is so small that we might miss the timer event. */
+					totalDelay += pIsrScriptEntry->deltaTime ;
 										
 					//---------------------------------------------------------------------------------
 					// LOW SIDE FET ON ENTRY - TURN ON LOW SIDE FET FOR THIS CHANNEL
@@ -428,6 +456,8 @@
 						 * the one for turning off the high side so we can +1 rather than using another
 						 * case statement.*/
 					pIsrScriptEntry->deltaTime = FET_SWITCH_TIME_CNT;
+					pIsrScriptEntry->waitInISR = true; //Tell ISR to wait because deltaTime is so small
+					totalDelay += pIsrScriptEntry->deltaTime;
 					
 					
 		} //end -  for(entryPair)
@@ -438,18 +468,29 @@
 		//---------------------------------------------------------------------------------
 		pIsrScriptEntry++; //Step to next  ISR script entry.
 		pIsrScriptEntry->command = ePwmCommand_ALLOFF;
-		pIsrScriptEntry->deltaTime = FET_SWITCH_TIME_CNT;
+		
+		pIsrScriptEntry->deltaTime = PWM_CYCLE_CNT - totalDelay - FET_SWITCH_TIME_CNT;
+			/*We want a deltaTime that triggers at the end of the PWM cycle. We actually want it to trigger 
+			 *FET_SWITCH_TIME_CNT earlier. Since we know the total delay assigned so far since 
+			 * start command (conveniently already calculated in 'totalDelay'), we can then calculate the 
+			 * deltaTime as shown above. */
+		
+		if (pIsrScriptEntry->deltaTime < MIN_TIMER_OCR_CNT) pIsrScriptEntry->waitInISR = true; 
+			/* Tell ISR not to exit if the deltaTime is so small that we might miss the timer event. */
+			
+		
 		
 			
 		//---------------------------------------------------------------------------------
 		// NOW TELL THE ISR TO SWITCH TO THE TABLE WE JUST CREATED
 		//---------------------------------------------------------------------------------
+		uint8_t sreg = SREG; //Save interrupt state
 		cli(); //Turn off interrupts while we write to active part of ISR's data
 		{
 			pwmIsrData.changeTable = true;
 			pwmIsrData.isActiveTableA = !pwmIsrData.isActiveTableA;			
 		}		
-		sei(); //Turn back up interrupts
+		SREG = sreg; //Restore Interrupt State
 	}
 
 

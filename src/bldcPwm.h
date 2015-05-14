@@ -17,7 +17,7 @@
 */	
 	
 /********************************************************************************************************/
-/* CLASS: bldcPwm
+/* CLASS: bldcPwm																						*/
 /** 3 Channel Pulse Width Modulator designed specifically for brushless DC Motors. 
  *																										*/
 /********************************************************************************************************/
@@ -34,7 +34,7 @@ class bldcPwm
 	
 	
 		/************************************************************************************************/
-		/*  ENUM: pwmChannels_E
+		/*  ENUM: pwmChannels_E																			*/
 		/** Identifies array elements for PWM channel in pwmChannel array.								*/
 		/************************************************************************************************/		
 			typedef enum pwmChannels_E
@@ -75,7 +75,7 @@ class bldcPwm
 			void update(void);
 			/**< Updates the ISR to use the latest PWM duty cycle setpoints. This must be called after
 			 * you have changed the pwm setpoints. You may change all 3 setpoints, and then call this 
-			 * method once. The PWM output will not change until this method is called. 
+			 * method once. The PWM output will not change until this method is called.					*/
 			/*------------------------------------------------------------------------------------------*/		 
 			
 			inline void set_pwm(pwmChannels_T channel, int16_t value) { _pwmChannel[channel].dutyCycle = value;}
