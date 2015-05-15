@@ -24,11 +24,11 @@
 #define  PWM_CYCLE_CNT	     (bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
      /**<Number of timer counts in one PWM cycle */
 
-#define MAX_LOWX_CNT		 PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1
+#define MAX_LOWX_CNT		 (uint16_t)(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1)
 	/**<Maximum absolute time the ePwmCommand_LOWx commands are allowed. Longer than this they conflict
 	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
 	
-#define MAX_OFFX_CNT		MAX_LOWX_CNT - FET_SWITCH_TIME_CNT
+#define MAX_OFFX_CNT		(uint16_t)(MAX_LOWX_CNT - FET_SWITCH_TIME_CNT)
 	/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
 	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/	
 	
@@ -147,7 +147,9 @@ class bldcPwm
    		    /*------------------------------------------------------------------------------------------*/
 			 { 
 					_pwmChannel[channel].dutyCycle = value;
-					_pwmChannel[channel].timerCount = pwmDuration_cnt(value);
+					uint16_t timerCount = pwmDuration_cnt(value);;					
+					timerCount = (timerCount >=MAX_OFFX_CNT? MAX_OFFX_CNT-1:timerCount);					
+					_pwmChannel[channel].timerCount = timerCount;
 			}
 			 
 
