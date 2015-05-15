@@ -342,14 +342,13 @@
 		
 		//---------------------------------------------------------------------------------
 		// POPULATE THE ABSOLUTE TIMES FOR EACH CHANNEL'S ePwmCommand_OFFx, ePwmCommand_LOWx
-		//---------------------------------------------------------------------------------
-		
+		//---------------------------------------------------------------------------------	
 		pSortEntry = &sortList[ePwmCommand_OFFA];
 		for (uint8_t pwmChannel = 0;pwmChannel <= 2;pwmChannel++)
 		{
 			/*Loop 3 times, one for each of ePwmChannel_A ePwmChannel_B, ePwmChannel_C */
 		
-			int16_t duration = pwmDuration_cnt((pwmChannels_T)pwmChannel);	
+			int16_t duration =  _pwmChannel[ePwmChannel_A].timerCount;;	
 				//calculate the absolute time in timer counts for this channel
 				
 			duration = (duration >=MAX_OFFX_CNT? MAX_OFFX_CNT-1:duration);

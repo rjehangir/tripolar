@@ -23,14 +23,14 @@
 	 /**< kMinTimerDelta_uS converted to timer counts  */
 #define  PWM_CYCLE_CNT	     (bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
      /**<Number of timer counts in one PWM cycle */
-#define MAX_OFFX_CNT		 PWM_CYCLE_CNT - 2*FET_SWITCH_TIME_CNT-1
-	/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
-	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
+
 #define MAX_LOWX_CNT		 PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1
 	/**<Maximum absolute time the ePwmCommand_LOWx commands are allowed. Longer than this they conflict
 	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
 	
-	
+#define MAX_OFFX_CNT		MAX_LOWX_CNT - FET_SWITCH_TIME_CNT
+	/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
+	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/	
 	
 /********************************************************************************************************/
 /* CLASS: bldcPwm																						*/
@@ -136,7 +136,7 @@ class bldcPwm
 			 * method once. The PWM output will not change until this method is called.					*/
 			/*------------------------------------------------------------------------------------------*/		 
 			
-			inline void set_pwm(pwmChannels_T channel, int16_t value) { _pwmChannel[channel].dutyCycle = value;}
+			inline void set_pwm(pwmChannels_T channel, int16_t value)
 			/**< Used to set the PWM duty cycle for any of the 3 pwm channels. Each channel corresponds to the 
 			 * 3 coils on the brushless DC's motor.
 			 * @param channel
@@ -145,6 +145,10 @@ class bldcPwm
 			 *		The PWM pulse width to set. Value will be between 0 and kDutyCycleFullScale where
 			 *		the high end of the range corresponds to 100% duty cycle.							*/
    		    /*------------------------------------------------------------------------------------------*/
+			 { 
+					_pwmChannel[channel].dutyCycle = value;
+					_pwmChannel[channel].timerCount = pwmDuration_cnt(value);
+			}
 			 
 
 	/*
@@ -164,7 +168,11 @@ class bldcPwm
 			{
 				uint16_t dutyCycle; 
 					/**< PWM Duty Cycle for Channel. Range is from 0 to PWM_CONTROL_FULL_SCALE_CNTS
-						* where a value of PWM_CONTROL_FULL_SCALE_CNTS indicates 100% pulse width.				*/
+						* where a value of PWM_CONTROL_FULL_SCALE_CNTS indicates 100% pulse width.			*/
+					
+				uint16_t timerCount;
+					/**< The number of timer counts that the channel is turned on during the pwm cycle.
+					 * we precalculate it and put it here to simplfy the update routine. */
 				bool used; 
 					/**< This is used during sorting to indicate whether this entry was already already
 						* used on a previous sort so that we dont reuse the entry on the next sort.			*/			
@@ -260,17 +268,17 @@ class bldcPwm
 		private:
 		
 		
-		inline uint16_t pwmDuration_cnt(pwmChannels_T channel)
+		inline uint16_t pwmDuration_cnt(uint16_t value)
 		/**< returns the pwm duration in timer counts. This is the amount of time that the pulse
 		 *  will remain on during the PWM cycle.
-		 *  @param channel 
-		 *		The pwm channel to read the value of.
+		 *  @param value 
+		 *		The pwm channel duty cycle. Same units as set_pwmChannel
 		 * @return 
 		 *		The number of timer counts that the selected channel will remain on 
 		 *      during the PWM cycle.																*/
 		/*------------------------------------------------------------------------------------------*/
 		{
-			return (PWM_CYCLE_CNT * (int32_t)_pwmChannel[channel].dutyCycle)  / kDutyCycleFullScale;			
+			return (PWM_CYCLE_CNT * (int32_t)value  )/ kDutyCycleFullScale;			
 		}
 	
 	
