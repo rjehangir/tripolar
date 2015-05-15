@@ -168,9 +168,11 @@ class bldcPwm
 					/**< The time from the start of the PWM cycle that the event is supposed to take place
 						* measured in timer counts. This is different from the deltaTime used in pwmEntry_S
 						* in that it is absolute time, rather than a delta from the previous event.			*/
-				int8_t nextIndex;
+				struct pwmSortList_S *pNextEntry;
 					/**< This is used for sorting of the list, it is the array index of the entry which 
-						* is next in the sort order. -1 Indicates its the last entry in list.															*/								
+						* is next in the sort order. 0 Indicates its the last entry in list.				*/		
+				
+						
 			}pwmSortList_T;
 					
 					

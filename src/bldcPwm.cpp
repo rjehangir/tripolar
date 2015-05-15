@@ -73,11 +73,11 @@
 					/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T	*/
 				volatile uint16_t	deltaTime; 
 					/**< What value the timer should be at when this command is executed. This is referenced
-						* as a delta from the time that the previous command was executed.						*/	
+						* as a delta from the time that the previous command was executed.					*/	
 				bool waitInISR; 
 					/**<set to true if deltaTime is so small that we risk missing the next ISR.					
 						* If set to true, the ISR will not exit on the previous entry, and instead,
-						* wait within the ISR for the next time to occur.										*/
+						* wait within the ISR for the next time to occur.									*/
 			}pwmEntry_T;
 		
 		
@@ -322,20 +322,13 @@
 	void  bldcPwm::update(void)
 	{
 		
-		uint16_t eventTimes[ePwmCommand_END_OF_ENUM];
-			/*An array of the absolute times for the isrPwmCommands to occur, where 
-			  the value held is the time from the start of the PWM cycle measured in 
-			  timer counts (on timer1). The array indexes correspond to the pwmCommand_E
-			  commands. For example array index 1 is the time that ePwmCommand_OFFA occurs.*/
-			 			  
-		uint8_t sortOrder[] = {0,1,2,3,4,5,6,7};
-			/*This holds the order in which each of the commands should be called. The index
-			  corresponds to the sort order (0 element holds the command which occurs first,
-			  1 holds the command which occurs second, etc). The value is the command which
-			  occurs in that order position.  This list starts unsorted, and this method
-			  will eventually sort the list based on the corresponding eventTimes array 
-			  entry. */		
-
+		pwmSortList_T sortList[ePwmCommand_END_OF_ENUM];
+		pwmSortList_T *pSortEntry;
+		pwmSortList_T *pPreviousEntry;
+		
+		uint8_t linkPosition = 0;
+		
+		
 		volatile pwmEntry_T *pIsrScriptEntry;   
 			/**< Pointer to the an entry in pwm script table which we are creating.
 			 * We use this point to navigate the table as we populate it. */		
@@ -344,54 +337,91 @@
 			/**<Running count of what time elapsed is since the start of the PWM cycle, as
              * of the last pIsrScriptEntry.  We do this to help convert absolute time into
              * deltaTime while populating the ISR data structure. Using are in counts. */
+		
 						
+		
+		for (uint8_t n=0;n<ePwmCommand_END_OF_ENUM;n++)
+		{
+			sortList[n].command = (pwmCommand_T)n;
+			sortList[n].pNextEntry = &sortList[n+1];
+		}
+		sortList[ePwmCommand_ALLOFF].pNextEntry = 0; //Mark the end of the linked list.
+		
+
 		//---------------------------------------------------------------------------------
 		// POPULATE THE ABSOLUTE TIMES
 		//---------------------------------------------------------------------------------
-		eventTimes[ePwmCommand_START] = 0;
-		eventTimes[ePwmCommand_OFFA] = _pwmChannel[ePwmChannel_A].dutyCycle;
-		eventTimes[ePwmCommand_LOWA] = _pwmChannel[ePwmChannel_A].dutyCycle + FET_SWITCH_TIME_CNT;		
-		eventTimes[ePwmCommand_OFFB] = _pwmChannel[ePwmChannel_B].dutyCycle;
-		eventTimes[ePwmCommand_LOWB] = _pwmChannel[ePwmChannel_B].dutyCycle + FET_SWITCH_TIME_CNT;
-		eventTimes[ePwmCommand_OFFC] = _pwmChannel[ePwmChannel_C].dutyCycle;
-		eventTimes[ePwmCommand_LOWC] = _pwmChannel[ePwmChannel_C].dutyCycle + FET_SWITCH_TIME_CNT;
-		eventTimes[ePwmCommand_ALLOFF] = PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT;
+
+
+
+		sortList[ePwmCommand_START].absoluteCount = 0;
+		sortList[ePwmCommand_OFFA].absoluteCount  = _pwmChannel[ePwmChannel_A].dutyCycle;
+		sortList[ePwmCommand_LOWA].absoluteCount  = _pwmChannel[ePwmChannel_A].dutyCycle + FET_SWITCH_TIME_CNT;		
+		sortList[ePwmCommand_OFFB].absoluteCount  = _pwmChannel[ePwmChannel_B].dutyCycle;
+		sortList[ePwmCommand_LOWB].absoluteCount  = _pwmChannel[ePwmChannel_B].dutyCycle + FET_SWITCH_TIME_CNT;
+		sortList[ePwmCommand_OFFC].absoluteCount  = _pwmChannel[ePwmChannel_C].dutyCycle;
+		sortList[ePwmCommand_LOWC].absoluteCount  = _pwmChannel[ePwmChannel_C].dutyCycle + FET_SWITCH_TIME_CNT;
+		sortList[ePwmCommand_ALLOFF].absoluteCount  = PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT;
 		
 		//Dont allow any times to exceed the ePwmCommand_ALLOFF time.
-		for (int n=1;n<ePwmCommand_ALLOFF;n+=2) if (eventTimes[n] >= MAX_OFFX_CNT) {
-			eventTimes[n] = MAX_OFFX_CNT;
-			eventTimes[n+1] = MAX_LOWX_CNT;			
+		for (int n=1;n<ePwmCommand_ALLOFF;n+=2) if (sortList[n].absoluteCount >= MAX_OFFX_CNT) {
+			sortList[n].absoluteCount = MAX_OFFX_CNT;
+			sortList[n+1].absoluteCount = MAX_LOWX_CNT;			
 		}
 		
 		//---------------------------------------------------------------------------------
 		// SORT THE LIST
 		//---------------------------------------------------------------------------------
+		/*Note that the first and last items in the list are fixed and don't need to 
+		 * be sorted. ePwmCommand_START is always first, and ePwmCommand_ALLOFF is 
+		 * always last. The consequence of this is: 1) We never have to change 
+		 * the PHeadEntry pointer (I trust that the compiler will optimize this out)
+		 * and 2) That we never have to check for insertion after the last entry. */
+
 		
-		for (uint8_t cycles = 0;cycles<4;cycles++)
-		{
-			for (uint8_t n=ePwmCommand_OFFA; n < ePwmCommand_ALLOFF; n++)
-			{
-				if (eventTimes[sortOrder[n]] >  eventTimes[sortOrder[n+1]]) {
-					uint8_t tempOrder = sortOrder[n+1];
-					sortOrder[n+1] = sortOrder[n];
-					sortOrder[n] = tempOrder;
+
+		
+		bool touchedFlag; //true is the list order was changed at all	
+		do {
+			linkPosition = 0;
+			pSortEntry = sortList; //The head is always the first element. See note above.
+		    touchedFlag = false; //true if the list order was changed at all
+			do {				
+				if (pSortEntry->absoluteCount > pSortEntry->pNextEntry->absoluteCount) {	
+					
+					pwmSortList_T* pTemp =pSortEntry->pNextEntry->pNextEntry;
+					pPreviousEntry->pNextEntry = pSortEntry->pNextEntry; //Previous Entry now points to guy after me
+					pSortEntry->pNextEntry->pNextEntry = pSortEntry;     //guy after me points to me
+					pSortEntry->pNextEntry = pTemp;						 //I point to what guy after me WAS pointing too					
+					touchedFlag = true;	 //We made a change, so this sort needs to run at least once more
 				}
-			}
-		}
+				
+				pPreviousEntry = pSortEntry;				
+			    pSortEntry = pSortEntry->pNextEntry;  //increment to next entry				
+				linkPosition++;
+
+				
+			}while (pSortEntry->pNextEntry->pNextEntry != 0);
+				/* Remember that the last position has a pNextEntry of 0.
+				 * If the we are at the second to last list position, no need to 
+				 * compare it with the last because by definition, nothing comes 
+				 * after the ePwmCommand_ALLOFF which was already placed there. */
+		} while (touchedFlag);
 				
 		//---------------------------------------------------------------------------------
 		// LOAD THE LIST INTO THE ISR DATA STRUCTURE
 		//---------------------------------------------------------------------------------	
 		pIsrScriptEntry  = (pwmIsrData.isActiveTableA ? pwmIsrData.tableB : pwmIsrData.tableA);	
 		
+		pSortEntry = sortList; //Reset pointer to first entry.
 		for (int n=0;n<8;n++)
-		{
-			
-			pIsrScriptEntry->command = (pwmCommand_T)sortOrder[n];
-			pIsrScriptEntry->deltaTime = sortOrder[n] - totalTime;
-			if (pIsrScriptEntry->deltaTime > MIN_TIMER_OCR_CNT ) pIsrScriptEntry->waitInISR = true;
-			totalTime += sortOrder[n];
-			pIsrScriptEntry++;						
+		{			
+			pIsrScriptEntry->command = (pwmCommand_T)pSortEntry->command;
+			pIsrScriptEntry->deltaTime = pSortEntry->absoluteCount - totalTime;
+			if (pIsrScriptEntry->deltaTime <= MIN_TIMER_OCR_CNT ) pIsrScriptEntry->waitInISR = true;
+			totalTime += pIsrScriptEntry->deltaTime;
+			pIsrScriptEntry++;	
+			pSortEntry = pSortEntry->pNextEntry;					
 		}
 		
 		//---------------------------------------------------------------------------------

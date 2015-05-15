@@ -32,8 +32,8 @@ int main(void)
 void setup(void)
 {
 	motorPwm.begin();
-	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,300);
-	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,300);
+	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,900);
+	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,600);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,300);
 	motorPwm.update();
 }
