@@ -37,20 +37,6 @@
 */
 
 
-#define  FET_SWITCH_TIME_CNT (uint16_t)(bldcPwm::kFetSwitchTime_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
-	 /**< kFetSwitchTime_uS converted to timer counts */
-#define  MIN_TIMER_OCR_CNT   (uint16_t)(bldcPwm::kMinTimerDelta_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
-	 /**< kMinTimerDelta_uS converted to timer counts  */
-#define  PWM_CYCLE_CNT	     (bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
-     /**<Number of timer counts in one PWM cycle */
-#define MAX_OFFX_CNT		 PWM_CYCLE_CNT - 2*FET_SWITCH_TIME_CNT-1
-	/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
-	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
-#define MAX_LOWX_CNT		 PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1
-	/**<Maximum absolute time the ePwmCommand_LOWx commands are allowed. Longer than this they conflict
-	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
-	
-
 
 
 
@@ -349,25 +335,47 @@
 		
 
 		//---------------------------------------------------------------------------------
-		// POPULATE THE ABSOLUTE TIMES
+		// POPULATE THE ABSOLUTE TIMES FOR START AND ALLOFF
 		//---------------------------------------------------------------------------------
-
-
-
 		sortList[ePwmCommand_START].absoluteCount = 0;
-		sortList[ePwmCommand_OFFA].absoluteCount  = _pwmChannel[ePwmChannel_A].dutyCycle;
-		sortList[ePwmCommand_LOWA].absoluteCount  = _pwmChannel[ePwmChannel_A].dutyCycle + FET_SWITCH_TIME_CNT;		
-		sortList[ePwmCommand_OFFB].absoluteCount  = _pwmChannel[ePwmChannel_B].dutyCycle;
-		sortList[ePwmCommand_LOWB].absoluteCount  = _pwmChannel[ePwmChannel_B].dutyCycle + FET_SWITCH_TIME_CNT;
-		sortList[ePwmCommand_OFFC].absoluteCount  = _pwmChannel[ePwmChannel_C].dutyCycle;
-		sortList[ePwmCommand_LOWC].absoluteCount  = _pwmChannel[ePwmChannel_C].dutyCycle + FET_SWITCH_TIME_CNT;
-		sortList[ePwmCommand_ALLOFF].absoluteCount  = PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT;
+		sortList[ePwmCommand_ALLOFF].absoluteCount = PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT;
 		
-		//Dont allow any times to exceed the ePwmCommand_ALLOFF time.
-		for (int n=1;n<ePwmCommand_ALLOFF;n+=2) if (sortList[n].absoluteCount >= MAX_OFFX_CNT) {
-			sortList[n].absoluteCount = MAX_OFFX_CNT;
-			sortList[n+1].absoluteCount = MAX_LOWX_CNT;			
+		//---------------------------------------------------------------------------------
+		// POPULATE THE ABSOLUTE TIMES FOR EACH CHANNEL'S ePwmCommand_OFFx, ePwmCommand_LOWx
+		//---------------------------------------------------------------------------------
+		
+		pSortEntry = &sortList[ePwmCommand_OFFA];
+		for (uint8_t pwmChannel = 0;pwmChannel <= 2;pwmChannel++)
+		{
+			/*Loop 3 times, one for each of ePwmChannel_A ePwmChannel_B, ePwmChannel_C */
+		
+			int16_t duration = pwmDuration_cnt((pwmChannels_T)pwmChannel);	
+				//calculate the absolute time in timer counts for this channel
+				
+			duration = (duration >=MAX_OFFX_CNT? MAX_OFFX_CNT-1:duration);
+				//Limit the duration so it does not extend to be >= the time
+				//when we turn all fets off at the end of the cycle.				
+				
+			pSortEntry->absoluteCount = duration;
+				/*Store the absolute time stamp for the ePwmCommand_OFFx 
+				  command for this channel. This will turn off the channels
+				  high side FET */
+			
+			pSortEntry++; 
+				/*Increment to the entry for the ePwmCommand_LOWx command 
+				 * for the same channel. */
+			
+			pSortEntry->absoluteCount = duration + FET_SWITCH_TIME_CNT;				
+				/*Store the absolute time for the ePwmCommand_LOWx to execute
+				  for this channel. This will turn on channel's low side fet
+				  a short delay after the high side was turned off. */
+				
+			pSortEntry++; 
+				/* increment to the next entry which is the ePwmCommand_OFFx
+				   command for the NEXT channel. */
 		}
+				
+		
 		
 		//---------------------------------------------------------------------------------
 		// SORT THE LIST
@@ -378,9 +386,6 @@
 		 * the PHeadEntry pointer (I trust that the compiler will optimize this out)
 		 * and 2) That we never have to check for insertion after the last entry. */
 
-		
-
-		
 		bool touchedFlag; //true is the list order was changed at all	
 		do {
 			linkPosition = 0;
@@ -423,6 +428,12 @@
 			pIsrScriptEntry++;	
 			pSortEntry = pSortEntry->pNextEntry;					
 		}
+		
+		//We need to fix the entry for ePwmCommand_START. Right now it has zero 
+		//delay, but it really needs to have a delay to allow time for the fets
+		//to respond after the ePwmCommand_ALLOFF command was executed. Despite
+		//sorting, we know that he is still the first entry in the list.
+		pSortEntry[0].absoluteCount = FET_SWITCH_TIME_CNT;
 		
 		//---------------------------------------------------------------------------------
 		// TELL THE ISR TO SWITCH TO THE TABLE WE JUST CREATED

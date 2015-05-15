@@ -12,9 +12,25 @@
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-&&& ISR PROTOTYPES
+&&& MACROS
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */	
+
+
+#define  FET_SWITCH_TIME_CNT (uint16_t)(bldcPwm::kFetSwitchTime_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
+	 /**< kFetSwitchTime_uS converted to timer counts */
+#define  MIN_TIMER_OCR_CNT   (uint16_t)(bldcPwm::kMinTimerDelta_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
+	 /**< kMinTimerDelta_uS converted to timer counts  */
+#define  PWM_CYCLE_CNT	     (bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
+     /**<Number of timer counts in one PWM cycle */
+#define MAX_OFFX_CNT		 PWM_CYCLE_CNT - 2*FET_SWITCH_TIME_CNT-1
+	/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
+	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
+#define MAX_LOWX_CNT		 PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1
+	/**<Maximum absolute time the ePwmCommand_LOWx commands are allowed. Longer than this they conflict
+	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
+	
+	
 	
 /********************************************************************************************************/
 /* CLASS: bldcPwm																						*/
@@ -170,9 +186,7 @@ class bldcPwm
 						* in that it is absolute time, rather than a delta from the previous event.			*/
 				struct pwmSortList_S *pNextEntry;
 					/**< This is used for sorting of the list, it is the array index of the entry which 
-						* is next in the sort order. 0 Indicates its the last entry in list.				*/		
-				
-						
+						* is next in the sort order. 0 Indicates its the last entry in list.				*/												
 			}pwmSortList_T;
 					
 					
@@ -246,7 +260,18 @@ class bldcPwm
 		private:
 		
 		
-
+		inline uint16_t pwmDuration_cnt(pwmChannels_T channel)
+		/**< returns the pwm duration in timer counts. This is the amount of time that the pulse
+		 *  will remain on during the PWM cycle.
+		 *  @param channel 
+		 *		The pwm channel to read the value of.
+		 * @return 
+		 *		The number of timer counts that the selected channel will remain on 
+		 *      during the PWM cycle.																*/
+		/*------------------------------------------------------------------------------------------*/
+		{
+			return (PWM_CYCLE_CNT * (int32_t)_pwmChannel[channel].dutyCycle)  / kDutyCycleFullScale;			
+		}
 	
 	
 	
