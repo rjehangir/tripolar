@@ -42,7 +42,43 @@ void setup(void)
 
 void loop(void)
 {
+	static int16_t loopCount = 0;
+	loopCount++;
 	
+	motorPwm.tickle();
+	
+	if (loopCount >=100)
+	{
+		incrementRotor();
+		loopCount = 0;	
+	}
 	
 	
 }
+
+
+
+
+
+
+void incrementRotor(void)
+{
+	static uint8_t currentStep = 0;	
+   uint8_t pwmA,pwmB,pwmC;		
+   uint8_t indexA,indexB,indexC;
+   
+   indexA = currentStep;
+   indexB = currentStep + PHASE_SHIFT;
+   indexC = indexB + PHASE_SHIFT;
+   
+   
+   pwmA = pgm_read_byte_near(pwmSin + indexA);
+   pwmB = pgm_read_byte_near(pwmSin + indexB);
+   pwmC = pgm_read_byte_near(pwmSin + indexC);
+   
+   	
+	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,pwmA);
+	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,pwmB);
+	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,pwmC);				
+ 	motorPwm.update();
+};
