@@ -246,15 +246,27 @@
 	****************************************************************************/		
 	bldcPwm::bldcPwm(void)
 	{
-		pwmIsrData.pTableStart = pwmIsrData.tableA;
-		pwmIsrData.isActiveTableA = true;
-		pwmIsrData.changeTable = false;
-		pwmIsrData.pEntry =  pwmIsrData.tableA;
-		pwmIsrData.pTableStart = pwmIsrData.tableA;
-		pwmIsrData.enabled = false;
 		
-		for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;
-																					
+		//Use temporary table in tableA for now...
+			pwmIsrData.pTableStart = pwmIsrData.tableA;
+			pwmIsrData.isActiveTableA = true; 
+			pwmIsrData.pEntry =  pwmIsrData.tableA;
+			
+			
+		/*Make Temporary table, with only one command which repeats, The ALLOFF command contains the
+		 logic for switching to a new active table which is required to allow the ISR to update
+		 with new PWM values. If this command is never executed (due to a blank table) the 
+		 pwm ISR wont update when the updateISR method is called */		
+			pwmIsrData.tableA[0].command = ePwmCommand_ALLOFF;
+			pwmIsrData.tableA[0].deltaTime = PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT;
+			pwmIsrData.tableA[0].waitInISR = false;
+					
+			
+		pwmIsrData.changeTable = false; //Dont change the table until updateISR is called.		
+												
+		pwmIsrData.enabled = false; //Enable the ISR routine.
+		
+		for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;																					
 	}
 
 
