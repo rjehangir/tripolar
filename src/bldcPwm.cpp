@@ -379,10 +379,13 @@
 		 * the PHeadEntry pointer (I trust that the compiler will optimize this out)
 		 * and 2) That we never have to check for insertion after the last entry. */
 
-		bool touchedFlag; //true is the list order was changed at all	
+		bool touchedFlag; ///<true if the list order was changed at all	
 		do {
 			linkPosition = 0;
-			pSortEntry = sortList; //The head is always the first element. See note above.
+			pSortEntry = sortList[0].pNextEntry; 
+				/* Skipping first entry, The head is always the first element. See note above. */
+			pPreviousEntry = sortList; //Since current entry is seconds element, previous is first
+				
 		    touchedFlag = false; //true if the list order was changed at all
 			do {				
 				if (pSortEntry->absoluteCount > pSortEntry->pNextEntry->absoluteCount) {	
@@ -404,6 +407,7 @@
 				 * If the we are at the second to last list position, no need to 
 				 * compare it with the last because by definition, nothing comes 
 				 * after the ePwmCommand_ALLOFF which was already placed there. */
+
 		} while (touchedFlag);
 				
 		//---------------------------------------------------------------------------------
@@ -411,8 +415,20 @@
 		//---------------------------------------------------------------------------------	
 		pIsrScriptEntry  = (pwmIsrData.isActiveTableA ? pwmIsrData.tableB : pwmIsrData.tableA);	
 		
-		pSortEntry = sortList; //Reset pointer to first entry.
-		for (int n=0;n<8;n++)
+		
+		
+		//Start is a special case  because we want to make the deltaTime
+		//FET_SWITCH_TIME_CNT rather than the 0 found in the sortList
+		//To make it easy,. just do it manually before we run the loop
+		//where we will then skip it.
+		pIsrScriptEntry->command = ePwmCommand_START;
+		pIsrScriptEntry->deltaTime = FET_SWITCH_TIME_CNT;
+		pIsrScriptEntry->waitInISR = true;
+		pIsrScriptEntry++;	//Move to second entry
+		
+		pSortEntry = (pwmSortList_T *)sortList[0].pNextEntry; //Reset pointer to second entry (skipping START command).
+		
+		for (int n=1;n<8;n++)
 		{			
 			pIsrScriptEntry->command = (pwmCommand_T)pSortEntry->command;
 			pIsrScriptEntry->deltaTime = pSortEntry->absoluteCount - totalTime;
@@ -422,11 +438,6 @@
 			pSortEntry = pSortEntry->pNextEntry;					
 		}
 		
-		//We need to fix the entry for ePwmCommand_START. Right now it has zero 
-		//delay, but it really needs to have a delay to allow time for the fets
-		//to respond after the ePwmCommand_ALLOFF command was executed. Despite
-		//sorting, we know that he is still the first entry in the list.
-		pSortEntry[0].absoluteCount = FET_SWITCH_TIME_CNT;
 		
 		//---------------------------------------------------------------------------------
 		// TELL THE ISR TO SWITCH TO THE TABLE WE JUST CREATED
@@ -437,7 +448,8 @@
 			pwmIsrData.changeTable = true;
 			pwmIsrData.isActiveTableA = !pwmIsrData.isActiveTableA;
 		}
-		SREG = sreg; //Restore Interrupt State			
+		SREG = sreg; //Restore Interrupt State		
+		_updateOutstanding = false;	
 	}
 	
 	
