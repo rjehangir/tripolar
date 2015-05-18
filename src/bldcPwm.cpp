@@ -19,7 +19,8 @@
 */
 
 #include <avr/io.h>
-
+#define F_CPU 16000000UL // 16 MHz
+#include <util/delay.h>
 #include <stdbool.h>
 #include "afro_nfet.h"
 #include "fets.h"
@@ -122,6 +123,18 @@
 		/**< Holds all information used by the pwm  timer interrupt service routine. 
 		 * See the declaration of pwmIsrData_T for more information	 */
 	  pwmEntry_T IsrCurrentEntry;
+	  
+	  const pwmEntry_T pwmInit[8] =  {		  
+									  {(bldcPwm::pwmCommand_T) 0,	32	,	1},
+									  {(bldcPwm::pwmCommand_T)5,	2340,	0},
+									  {(bldcPwm::pwmCommand_T)6,	32,	1},
+									  {(bldcPwm::pwmCommand_T)3, 2314, 0},
+									  {(bldcPwm::pwmCommand_T)4,32,1},
+									  {(bldcPwm::pwmCommand_T)1,2314,0},
+									  {(bldcPwm::pwmCommand_T)2,32,1},
+									  {(bldcPwm::pwmCommand_T)7,898,0}
+								  };
+	  
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -216,11 +229,11 @@
 			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
 			
-			TIFR |= _BV(OCF1A); // Clear any pending interrupts 	
+			TIFR &= ~_BV(OCF1A); // Clear any pending interrupts 	
 			OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
 			if (! pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
 
-			while (TCNT1 < pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
+			while ((TIFR & _BV(OCF1A)) == 0)asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
 				
 		} while(1);
 		
@@ -256,12 +269,15 @@
 		/*Make Temporary table, with only one command which repeats, The ALLOFF command contains the
 		 logic for switching to a new active table which is required to allow the ISR to update
 		 with new PWM values. If this command is never executed (due to a blank table) the 
-		 pwm ISR wont update when the updateISR method is called */		
+		 pwm ISR wont update when the updateISR method is called */	
+		
+        /*			
 			pwmIsrData.tableA[0].command = ePwmCommand_ALLOFF;
 			pwmIsrData.tableA[0].deltaTime = PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT;
 			pwmIsrData.tableA[0].waitInISR = false;
-					
-			
+		*/
+		
+		memcpy((void *)pwmIsrData.tableA,(const void *)pwmInit,sizeof(pwmInit));
 		pwmIsrData.changeTable = false; //Dont change the table until updateISR is called.		
 												
 		pwmIsrData.enabled = false; //Enable the ISR routine.
@@ -280,21 +296,34 @@
 	void bldcPwm::begin(void)
 	{
 		cli();
+			boardInit(); //Part of ESC include file, sets up the output pins.
+			lowSideOff();
+			highSideOff();
+			//_delay_ms(100);
 		//Initialize ISR Data 
-			pwmIsrData.pTableStart = pwmIsrData.tableA;
+		/*	pwmIsrData.pTableStart = pwmIsrData.tableA;
 			pwmIsrData.isActiveTableA = true;
 			pwmIsrData.changeTable = false;
 			pwmIsrData.pEntry =  pwmIsrData.tableA;
 			pwmIsrData.pTableStart = 	 pwmIsrData.tableA;
 			pwmIsrData.enabled = false;
 			
-		update();  //Initialize the pwmIsrData.table
+	*/	
 		
+									
+			
+	/*	set_pwm(bldcPwm::ePwmChannel_A,900);
+		set_pwm(bldcPwm::ePwmChannel_B,600);
+		set_pwm(bldcPwm::ePwmChannel_C,300);
+			
+		update();  //Initialize the pwmIsrData.table  */
+		
+		//_delay_ms(100);
 		// Reset timer
-			TCCR1A = 0;
-			TCCR1B = 0;
-			TIMSK = 0;
-			TCNT1 = 0;
+		TCCR1A = 0;
+		TCCR1B = 0;
+		TIMSK = 0;
+		TCNT1 = 0;
 		
 		OCR1A = 100*kTimerFreq_Khz;	
 			/* Set compare match register to overflow at 100ms, which means 
@@ -306,7 +335,9 @@
 		TIFR |= _BV(OCF1A); // Clear any pending interrupts
 		
 		pwmIsrData.enabled = true;
+	//	_delay_ms(100);
 		sei();			
+	//	_delay_ms(100);
 	}
 
 

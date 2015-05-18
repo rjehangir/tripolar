@@ -68,12 +68,16 @@ bldcPwm motorPwm;
 
 int main(void)
 {
+	
+	//_delay_ms(1000);
 	setup();
+	
+	
     while(1)
     {
         //TODO:: Please write your application code 
 		loop();
-    }
+    } 
 }
 
 
@@ -81,10 +85,10 @@ int main(void)
 void setup(void)
 {
 	motorPwm.begin();
-	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,900);
+	/*motorPwm.set_pwm(bldcPwm::ePwmChannel_A,900);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,600);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,300);
-	motorPwm.update();
+	motorPwm.update(); */
 }
 
 
@@ -93,15 +97,17 @@ void loop(void)
 {
 	static int16_t loopCount = 0;
 	loopCount++;
-	
+/*	
 	motorPwm.tickle();
-	
-	if (loopCount >=100)
+
+
+	if (loopCount >=1000)
 	{
 		incrementRotor();
 		loopCount = 0;	
 	}
-	
+
+	*/
 	
 }
 
@@ -113,19 +119,21 @@ void loop(void)
 void incrementRotor(void)
 {
 	static uint8_t currentStep = 0;	
-   uint8_t pwmA,pwmB,pwmC;		
+   uint16_t pwmA,pwmB,pwmC;		
    uint8_t indexA,indexB,indexC;
+   uint8_t setA, setB, setC;
    
-   indexA = currentStep;
+   
+   indexA = currentStep++;
    indexB = currentStep + PHASE_SHIFT;
    indexC = indexB + PHASE_SHIFT;
    
    
-   pwmA = pgm_read_byte_near(pwmSin + indexA);
-   pwmB = pgm_read_byte_near(pwmSin + indexB);
-   pwmC = pgm_read_byte_near(pwmSin + indexC);
+   pwmA = pgm_read_byte_near(pwmSin + indexA) * 4;
+   pwmB = pgm_read_byte_near(pwmSin + indexB) * 4;
+   pwmC = pgm_read_byte_near(pwmSin + indexC) * 4;
    
-   	
+  
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,pwmA);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,pwmB);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,pwmC);				
