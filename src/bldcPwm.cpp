@@ -310,17 +310,25 @@
 	}
 
 
+
 	 	 
 	/****************************************************************************
 	*  Class: bldcPwm
-	*  Method: update
+	*  Method: updateISR
 	*	Description:
 	*		See class header file for a full API description of this method
 	****************************************************************************/		
-	void  bldcPwm::update(void)
+	void  bldcPwm::updateISR(void)
 	{
-		
-		pwmSortList_T sortList[ePwmCommand_END_OF_ENUM];
+	
+		if (busy()) return;	
+
+		static pwmSortList_T sortList[ePwmCommand_END_OF_ENUM];
+			/**< A temporary list which information on each ISR command and its absolute
+			 * time. Includes addition fields which support list sorting. A list of commands
+			 * is made here first, sorted, and then finally exported to the ISR data structure. 
+			 * it is made 'static' to prevent it from being put on the stack, which is too small
+			 * to hold it.*/
 		pwmSortList_T *pSortEntry;
 		pwmSortList_T *pPreviousEntry;
 		
@@ -435,3 +443,19 @@
 	
 	
 	
+         
+	/****************************************************************************
+	*  Class: bldcPwm
+	*  Method: busy
+	*	Description:
+	*		See class header file for a full API description of this method
+	****************************************************************************/	
+	bool bldcPwm::busy(void)
+	{
+		bool retVal;				
+		cli();
+		retVal = pwmIsrData.changeTable;
+		sei();
+		return retVal;
+				
+	}

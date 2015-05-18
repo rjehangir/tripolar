@@ -128,13 +128,20 @@ class bldcPwm
 			/**< Setup method for class. Call this after the class is instantiated, but before using 
 				* the class.																			*/
 			/*------------------------------------------------------------------------------------------*/
+			
+			
+			inline void tickle(void) { if (_updateOutstanding) updateISR();}
+			/**< This function needs to be called on a regular basis to enable the this class to do
+			 * housekeeping. Primarily, this is used to update the ISR if an update was made before
+			 * but the ISR was busy and could not accept a new value.									 */
+			 /*------------------------------------------------------------------------------------------*/
+			 
 		
-		
-			void update(void);
+			inline void update(void) {_updateOutstanding = true; updateISR();}
 			/**< Updates the ISR to use the latest PWM duty cycle setpoints. This must be called after
 			 * you have changed the pwm setpoints. You may change all 3 setpoints, and then call this 
 			 * method once. The PWM output will not change until this method is called.					*/
-			/*------------------------------------------------------------------------------------------*/		 
+			/*------------------------------------------------------------------------------------------*/				
 			
 			inline void set_pwm(pwmChannels_T channel, int16_t value)
 			/**< Used to set the PWM duty cycle for any of the 3 pwm channels. Each channel corresponds to the 
@@ -150,9 +157,13 @@ class bldcPwm
 					uint16_t timerCount = pwmDuration_cnt(value);;					
 					timerCount = (timerCount >=MAX_OFFX_CNT? MAX_OFFX_CNT-1:timerCount);					
 					_pwmChannel[channel].timerCount = timerCount;
+					
 			}
-			 
-
+			
+			inline bool busy(void);
+			/**< Indicates if the ISR has not loaded the previous value
+			 * @return true if the ISR can not accept a new PWM value. */
+		
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	&&& PRIVATE STRUCTURE DEFINITIONS
@@ -213,6 +224,9 @@ class bldcPwm
 				/**< Holds non ISR data related to controlling the PWM channels. Each element in the array 
 				 * corresponds to a pwm channel as indexed by pwmChannels_T. The user sets each of these element
 				 * to configure the pwm. He then calls setPwmIsr() which will read this data and setup pwmIsrData  */								
+			bool _updateOutstanding;
+				/**< If true, indicates that one of the pwm values have been changed, but has not
+				 * been updated in the ISR yet. */
 						
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -282,6 +296,14 @@ class bldcPwm
 		{
 			return (PWM_CYCLE_CNT * (int32_t)value  )/ kDutyCycleFullScale;			
 		}
+		
+		
+		
+		 void updateISR(void);
+		/* Takes the _pwmChannel[] data and updates the data structure which feeds the ISR
+		 * so that these new PWM values are refected at the begining of the next cycle				*/
+		/*------------------------------------------------------------------------------------------*/
+		
 	
 	
 	
