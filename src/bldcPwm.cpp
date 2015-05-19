@@ -325,7 +325,7 @@
 		TIMSK = 0;
 		TCNT1 = 0;
 		
-		OCR1A = 100*kTimerFreq_Khz;	
+		OCR1A = 100*PWM_TIMER_FREQ_KHZ;	
 			/* Set compare match register to overflow at 100ms, which means 
 			   the PWM will have its first interrupt in 100ms..
 			   Which means PWM starts in 100ms		*/

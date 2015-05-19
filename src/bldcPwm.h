@@ -10,6 +10,62 @@
 #define BLDCPWM_H_
 
 
+
+
+
+
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& USER CONFIGURATION
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/	
+
+
+	#define kDutyCycleFullScale  1023
+			/**< Upper scale for duty cycle specification. For the set PWM method, this number is the 100% 
+			 * duty cycle equivelent. The set_pwm method will accept duty cycles between 0 and this number,
+			 * where kDutyCycleFullScale is 100% duty cycle.												*/
+			
+	#define  kFetSwitchTime_uS 2
+			/**< Fet Turn on Time in micro-seconds. FETS do not switch on or off instantly. There will be a
+			 * delay from the time that we initiate turning off a fet, to the time that the FET is truly off.
+			 * Since the we running half H bridges, a condition where both the high and low side FET are 
+			 * turned on will create a short from power to ground. If we switched the High and Low side FETs
+			 * at exactly the same time, the turn off delay would create a time window where both FETs are on
+			 * at the same time. To prevent this, will implement kFetSwitchTime_nS delay (in micro-seconds) 
+			 * between the time that we turn one fet on an h bridge off and the time that we turn the other
+			 * FET (on the same HBridge) on.																*/
+			
+#define  kMinTimerDelta_uS  5
+			/**< Minimum Time Delta required for PWM ISR Exit in micro seconds. 
+			 * When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
+			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
+			 * set too close to the current time, we could have issues where we might might miss the next
+			 * interrupt while we are busy setting it up. To prevent this, we set a rule which says that 
+			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
+			 * to wait for the next event, rather than risk leaving the ISR.								*/
+			
+#define PWM_FREQ_KHZ  2
+			/**< Pwm Frequency in KiloHertz.
+			 *  When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
+			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
+			 * set too close to the current time, we could have issues where we might might miss the next
+			 * interrupt while we are busy setting it up. To prevent this, we set a rule which says that 
+			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
+			 * to wait for the next event, rather than risk leaving the ISR.								*/
+			
+#define COIL_RATIO  7  
+			/**< The number of sine cycles each coil needs to go through for motor to 
+			 * make on rotation																				*/
+						
+#define PWM_TIMER_FREQ_KHZ  (uint16_t)16000
+			/**< The frequency which timer1 (the 16 bit timer) is running at. If you change the prescaling
+			 * or the clock frequency such that the timer frequency changes, you will need to change this 
+			 * number.																						*/		
+
+
+
+
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& MACROS
@@ -17,18 +73,18 @@
 */	
 
 
-#define  FET_SWITCH_TIME_CNT (uint16_t)(bldcPwm::kFetSwitchTime_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
+#define  FET_SWITCH_TIME_CNT ((uint16_t)(kFetSwitchTime_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
 	 /**< kFetSwitchTime_uS converted to timer counts */
-#define  MIN_TIMER_OCR_CNT   (uint16_t)(bldcPwm::kMinTimerDelta_uS*(bldcPwm::kTimerFreq_Khz/1000)) 
+#define  MIN_TIMER_OCR_CNT   ((uint16_t)(kMinTimerDelta_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
 	 /**< kMinTimerDelta_uS converted to timer counts  */
-#define  PWM_CYCLE_CNT	     (bldcPwm::kTimerFreq_Khz/bldcPwm::kPwmFreq_Khz)	
+#define  PWM_CYCLE_CNT	    ((PWM_TIMER_FREQ_KHZ/PWM_FREQ_KHZ)	)
      /**<Number of timer counts in one PWM cycle */
 
-#define MAX_LOWX_CNT		 (uint16_t)(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1)
+#define MAX_LOWX_CNT		( (uint16_t)(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1))
 	/**<Maximum absolute time the ePwmCommand_LOWx commands are allowed. Longer than this they conflict
 	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
 	
-#define MAX_OFFX_CNT		(uint16_t)(MAX_LOWX_CNT - FET_SWITCH_TIME_CNT)
+#define MAX_OFFX_CNT		((uint16_t)(MAX_LOWX_CNT - FET_SWITCH_TIME_CNT))
 	/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
 	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/	
 	
@@ -154,9 +210,7 @@ class bldcPwm
    		    /*------------------------------------------------------------------------------------------*/
 			 { 
 					_pwmChannel[channel].dutyCycle = value;
-					uint16_t timerCount = pwmDuration_cnt(value);;					
-					timerCount = (timerCount >=MAX_OFFX_CNT? MAX_OFFX_CNT-1:timerCount);					
-					_pwmChannel[channel].timerCount = timerCount;
+				
 					
 			}
 			
@@ -234,47 +288,7 @@ class bldcPwm
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	*/	public:	  //Some of these need to be accessed by the ISR, so we need to be public here.
 				
-		static const uint16_t kDutyCycleFullScale = 1023;
-			/**< Upper scale for duty cycle specification. For the set PWM method, this number is the 100% 
-			 * duty cycle equivelent. The set_pwm method will accept duty cycles between 0 and this number,
-			 * where kDutyCycleFullScale is 100% duty cycle.												*/
-			
-		static const uint8_t kFetSwitchTime_uS = 2;
-			/**< Fet Turn on Time in micro-seconds. FETS do not switch on or off instantly. There will be a
-			 * delay from the time that we initiate turning off a fet, to the time that the FET is truly off.
-			 * Since the we running half H bridges, a condition where both the high and low side FET are 
-			 * turned on will create a short from power to ground. If we switched the High and Low side FETs
-			 * at exactly the same time, the turn off delay would create a time window where both FETs are on
-			 * at the same time. To prevent this, will implement kFetSwitchTime_nS delay (in micro-seconds) 
-			 * between the time that we turn one fet on an h bridge off and the time that we turn the other
-			 * FET (on the same HBridge) on.																*/
-			
-		static const uint8_t kMinTimerDelta_uS = 5;
-			/**< Minimum Time Delta required for PWM ISR Exit in micro seconds. 
-			 * When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
-			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
-			 * set too close to the current time, we could have issues where we might might miss the next
-			 * interrupt while we are busy setting it up. To prevent this, we set a rule which says that 
-			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
-			 * to wait for the next event, rather than risk leaving the ISR.								*/
-			
-		static const uint8_t kPwmFreq_Khz = 2;
-			/**< Pwm Frequency in KiloHertz.
-			 *  When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
-			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
-			 * set too close to the current time, we could have issues where we might might miss the next
-			 * interrupt while we are busy setting it up. To prevent this, we set a rule which says that 
-			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
-			 * to wait for the next event, rather than risk leaving the ISR.								*/
-			
-		static const uint8_t kCoilRatio = 7;
-			/**< The number of sine cycles each coil needs to go through for motor to 
-			 * make on rotation																				*/
-			
-		static const uint16_t kTimerFreq_Khz = 16000;
-			/**< The frequency which timer1 (the 16 bit timer) is running at. If you change the prescaling
-			 * or the clock frequency such that the timer frequency changes, you will need to change this 
-			 * number.																						*/
+																				
 			
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -294,7 +308,7 @@ class bldcPwm
 		 *      during the PWM cycle.																*/
 		/*------------------------------------------------------------------------------------------*/
 		{
-			return (PWM_CYCLE_CNT * (int32_t)value  )/ kDutyCycleFullScale;			
+			return (PWM_CYCLE_CNT * (int32_t)value  ) / kDutyCycleFullScale;			
 		}
 		
 		
