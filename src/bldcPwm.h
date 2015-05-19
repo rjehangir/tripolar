@@ -26,7 +26,7 @@
 			 * duty cycle equivelent. The set_pwm method will accept duty cycles between 0 and this number,
 			 * where kDutyCycleFullScale is 100% duty cycle.												*/
 			
-	#define  kFetSwitchTime_uS 2
+	#define  kFetSwitchTime_uS 20
 			/**< Fet Turn on Time in micro-seconds. FETS do not switch on or off instantly. There will be a
 			 * delay from the time that we initiate turning off a fet, to the time that the FET is truly off.
 			 * Since the we running half H bridges, a condition where both the high and low side FET are 
@@ -45,8 +45,8 @@
 			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
 			
-#define PWM_FREQ_KHZ  2
-			/**< Pwm Frequency in KiloHertz.
+#define PWM_FREQ_KHZ 1
+			/**< Pwm Frequency in Tenths of A KiloHertz.
 			 *  When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
 			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
 			 * set too close to the current time, we could have issues where we might might miss the next
@@ -77,7 +77,7 @@
 	 /**< kFetSwitchTime_uS converted to timer counts */
 #define  MIN_TIMER_OCR_CNT   ((uint16_t)(kMinTimerDelta_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
 	 /**< kMinTimerDelta_uS converted to timer counts  */
-#define  PWM_CYCLE_CNT	    ((PWM_TIMER_FREQ_KHZ/PWM_FREQ_KHZ)	)
+#define  PWM_CYCLE_CNT	    ((uint16_t)((PWM_TIMER_FREQ_KHZ)/(PWM_FREQ_KHZ))	)
      /**<Number of timer counts in one PWM cycle */
 
 #define MAX_LOWX_CNT		( (uint16_t)(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1))
@@ -214,9 +214,12 @@ class bldcPwm
 					
 			}
 			
-			inline bool busy(void);
+			 bool busy(void);
 			/**< Indicates if the ISR has not loaded the previous value
 			 * @return true if the ISR can not accept a new PWM value. */
+			
+			 void isrEnable(bool isEnabled);
+			
 		
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -308,7 +311,7 @@ class bldcPwm
 		 *      during the PWM cycle.																*/
 		/*------------------------------------------------------------------------------------------*/
 		{
-			return (PWM_CYCLE_CNT * (int32_t)value  ) / kDutyCycleFullScale;			
+			return ((int32_t)PWM_CYCLE_CNT * (int32_t)value  ) / kDutyCycleFullScale;			
 		}
 		
 		

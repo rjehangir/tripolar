@@ -125,14 +125,14 @@
 	  pwmEntry_T IsrCurrentEntry;
 	  
 	  const pwmEntry_T pwmInit[8] =  {		  
-									  {(bldcPwm::pwmCommand_T) 0,	32	,	1},
-									  {(bldcPwm::pwmCommand_T)5,	2340,	0},
-									  {(bldcPwm::pwmCommand_T)6,	32,	1},
-									  {(bldcPwm::pwmCommand_T)3, 2314, 0},
-									  {(bldcPwm::pwmCommand_T)4,32,1},
-									  {(bldcPwm::pwmCommand_T)1,2314,0},
-									  {(bldcPwm::pwmCommand_T)2,32,1},
-									  {(bldcPwm::pwmCommand_T)7,898,0}
+									  {(bldcPwm::pwmCommand_T) 0,	100	,	1},
+									  {(bldcPwm::pwmCommand_T)5,	500,	0},
+									  {(bldcPwm::pwmCommand_T)6,	100,	1},
+									  {(bldcPwm::pwmCommand_T)3, 4000, 0},
+									  {(bldcPwm::pwmCommand_T)4,100,1},
+									  {(bldcPwm::pwmCommand_T)1,4000,0},
+									  {(bldcPwm::pwmCommand_T)2,100,1},
+									  {(bldcPwm::pwmCommand_T)7,2000,0}
 								  };
 	  
 
@@ -233,7 +233,9 @@
 			OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
 			TCNT1 = 0;
 			TIFR = _BV(OCF1A); // Clear any pending interrupts 				
+			break;
 			if (! pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
+			
 
 			while ((TIFR & _BV(OCF1A)) == 0)asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
 				
@@ -298,6 +300,7 @@
 	void bldcPwm::begin(void)
 	{
 		cli();
+		
 			boardInit(); //Part of ESC include file, sets up the output pins.
 			lowSideOff();
 			highSideOff();
@@ -321,11 +324,13 @@
 		update();  //Initialize the pwmIsrData.table  */
 		
 		//_delay_ms(100);
+		_delay_ms(500);
 		// Reset timer
 		TCCR1A = 0;
 		TCCR1B = 0;
 		TIMSK = 0;
 		TCNT1 = 0;
+		
 		
 		OCR1A = 100*PWM_TIMER_FREQ_KHZ;	
 			/* Set compare match register to overflow at 100ms, which means 
@@ -338,7 +343,9 @@
 		
 		pwmIsrData.enabled = true;
 	//	_delay_ms(100);
-		sei();			
+		_delay_ms(500);
+		sei();	
+			_delay_ms(500);		
 	//	_delay_ms(100);
 	}
 
@@ -394,7 +401,7 @@
 		for (uint16_t channel = 0; channel <3;channel++)
 		{
 			uint16_t timerCount = pwmDuration_cnt(_pwmChannel[channel].dutyCycle);					
-			timerCount = (timerCount >=(MAX_OFFX_CNT)? (MAX_OFFX_CNT)-1:timerCount);					
+			timerCount = (timerCount >=(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT)? (PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT-1):timerCount);					
 			_pwmChannel[channel].timerCount = timerCount;
 		}
 
@@ -514,4 +521,17 @@
 		sei();
 		return retVal;
 				
+	}
+	
+	
+         
+	/****************************************************************************
+	*  Class: bldcPwm
+	*  Method: enable
+	*	Description:
+	*		See class header file for a full API description of this method
+	****************************************************************************/	
+	void bldcPwm::isrEnable(bool isEnable)
+	{
+		pwmIsrData.enabled = isEnable;
 	}

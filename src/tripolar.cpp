@@ -30,8 +30,8 @@ void incrementRotor(void);
 	/****************************************************************************/	
 	
 	
-	      			 															
-	static const uint8_t pwmSin[256] PROGMEM = 	
+	static const uint8_t pwmSin[256]  = 	    			 															
+	//static const uint8_t pwmSin[256] PROGMEM = 	
 	{
 				128, 	131, 	134, 	137, 	140, 	143, 	146, 	149, 	152, 	156, 	//	0	 to 	9
 				159, 	162, 	165, 	168, 	171, 	174, 	176, 	179, 	182, 	185, 	//	10	 to 	19
@@ -84,7 +84,9 @@ int main(void)
 
 void setup(void)
 {
+	
 	motorPwm.begin();
+	
 	/*motorPwm.set_pwm(bldcPwm::ePwmChannel_A,900);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,600);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,300);
@@ -96,16 +98,23 @@ void setup(void)
 void loop(void)
 {
 	static int16_t loopCount = 0;
+	static bool done = false;
+	static bool enabled = true;
 	loopCount++;
 	
 	motorPwm.tickle();
+	//incrementRotor();
 
 
-	if (loopCount >=10)
+	if (loopCount >=100)
 	{
-	//	incrementRotor();
+		incrementRotor();
+		done = true;
 		loopCount = 0;	
-	}
+		//enabled = !enabled;
+		//motorPwm.isrEnable(enabled);
+		
+	} 
 
 	
 	
@@ -121,17 +130,21 @@ void incrementRotor(void)
 	static uint8_t currentStep = 0;	
    uint16_t pwmA,pwmB,pwmC;		
    uint8_t indexA,indexB,indexC;
-   uint8_t setA, setB, setC;
+
    
    
-   indexA = currentStep++;
+   indexA = currentStep += 1;
    indexB = currentStep + PHASE_SHIFT;
    indexC = indexB + PHASE_SHIFT;
    
    
-   pwmA = pgm_read_byte_near(pwmSin + indexA) * 4;
-   pwmB = pgm_read_byte_near(pwmSin + indexB) * 4;
-   pwmC = pgm_read_byte_near(pwmSin + indexC) * 4;
+  // pwmA = pgm_read_byte_near(pwmSin + indexA) * 4;
+  // pwmB = pgm_read_byte_near(pwmSin + indexB) * 4;
+  // pwmC = pgm_read_byte_near(pwmSin + indexC) * 4;
+  
+  pwmA = pwmSin[indexA]*4;
+  pwmB = pwmSin[indexB]*4;
+  pwmC = pwmSin[indexC]*4;
    
   
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,pwmA);
