@@ -229,8 +229,10 @@
 			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
 			
-			TIFR &= ~_BV(OCF1A); // Clear any pending interrupts 	
+			//TIFR = _BV(OCF1A); // Clear any pending interrupts 				
 			OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
+			TCNT1 = 0;
+			TIFR = _BV(OCF1A); // Clear any pending interrupts 				
 			if (! pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
 
 			while ((TIFR & _BV(OCF1A)) == 0)asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
@@ -384,6 +386,17 @@
 		}
 		sortList[ePwmCommand_ALLOFF].pNextEntry = 0; //Mark the end of the linked list.
 		
+
+		
+		//---------------------------------------------------------------------------------
+		// COVVERT FROM DUTY CYCLE TO TIMER EXPIRATION
+		//---------------------------------------------------------------------------------				
+		for (uint16_t channel = 0; channel <3;channel++)
+		{
+			uint16_t timerCount = pwmDuration_cnt(_pwmChannel[channel].dutyCycle);					
+			timerCount = (timerCount >=(MAX_OFFX_CNT)? (MAX_OFFX_CNT)-1:timerCount);					
+			_pwmChannel[channel].timerCount = timerCount;
+		}
 
 		//---------------------------------------------------------------------------------
 		// POPULATE THE ABSOLUTE TIMES FOR START AND ALLOFF

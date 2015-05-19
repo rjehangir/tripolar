@@ -97,17 +97,17 @@ void loop(void)
 {
 	static int16_t loopCount = 0;
 	loopCount++;
-/*	
+	
 	motorPwm.tickle();
 
 
-	if (loopCount >=1000)
+	if (loopCount >=10)
 	{
-		incrementRotor();
+	//	incrementRotor();
 		loopCount = 0;	
 	}
 
-	*/
+	
 	
 }
 
