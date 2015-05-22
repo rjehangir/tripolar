@@ -22,6 +22,8 @@
 #define F_CPU 16000000UL // 16 MHz
 #include <util/delay.h>
 #include <stdbool.h>
+
+//#define DO_DEBUG
 #include "afro_nfet.h"
 #include "fets.h"
 #include <avr/io.h>
@@ -170,12 +172,21 @@
 	/****************************************************************************************************/			
 	ISR(TIMER1_COMPA_vect) 
 	{
+ 		DEBUG_OUT(0x08);
+		redOn();
 		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.
 		if (!pwmIsrData.enabled) return;
 		do {
+			DEBUG_OUT(0x09);
+			
+			//DEBUG_OUT(pwmIsrData.pEntry->command);
+		
+		
+			
 			switch (pwmIsrData.pEntry->command)
 			{
 				case bldcPwm::ePwmCommand_START:
+					//_delay_ms(10);
 					ApFETOn();
 					BpFETOn();
 					CpFETOn();
@@ -186,6 +197,7 @@
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWA:
+					//_delay_ms(10);
 					AnFETOn();
 					incEntry = true;
 					break;
@@ -194,6 +206,7 @@
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWB:
+					//_delay_ms(10);
 					BnFETOn();
 					incEntry = true;
 					break;
@@ -202,13 +215,18 @@
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWC:
+					//_delay_ms(10);
 					CnFETOn();
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_ALLOFF:
+					//AnFETOff();
+					//highSideOff();
 					lowSideOff();
+				
 					if (pwmIsrData.changeTable == true)  //If user has requested a change of tables then ...
 					{
+						DEBUG_OUT(0x0A);
 						pwmIsrData.pTableStart = (pwmIsrData.isActiveTableA ? pwmIsrData.tableA : pwmIsrData.tableB);										
 							/* Go to the beginning of the next table */
 						pwmIsrData.changeTable = false;															
@@ -217,10 +235,12 @@
 							 * the change over was made, so that he knows when he can start writing to the 
 							 * free table again. so we reset the flag here.									*/
 					}
+					//pwmIsrData.pEntry = pwmIsrData.tableA;
 					pwmIsrData.pEntry = pwmIsrData.pTableStart; //Reset script entry to beginning.
 					incEntry = false; //Don't increment entry because we just sent entry to beginning instead.
 					break;				
 				default:
+					DEBUG_OUT(0xFF);
 					//Something is very wrong, stop processing the ISR
 					pwmIsrData.enabled	 = false;
 					break;					
@@ -229,10 +249,12 @@
 			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
 			
-			//TIFR = _BV(OCF1A); // Clear any pending interrupts 				
+			
+			TIFR = _BV(OCF1A); // Clear any pending interrupts 				
 			OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
 			TCNT1 = 0;
-			TIFR = _BV(OCF1A); // Clear any pending interrupts 				
+			//TIFR = _BV(OCF1A); // Clear any pending interrupts 				
+			DEBUG_OUT(0x0B);
 			break;
 			if (! pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
 			
@@ -242,7 +264,9 @@
 		} while(1);
 		
 		//   <========== !!!!!!! CLEAR THE INTERRUPT SOURCE !!!!!!!!
-			
+		
+	redOff();	
+	DEBUG_OUT(0x00);	
 	}
 
 
@@ -268,25 +292,11 @@
 			pwmIsrData.pTableStart = pwmIsrData.tableA;
 			pwmIsrData.isActiveTableA = true; 
 			pwmIsrData.pEntry =  pwmIsrData.tableA;
-			
-			
-		/*Make Temporary table, with only one command which repeats, The ALLOFF command contains the
-		 logic for switching to a new active table which is required to allow the ISR to update
-		 with new PWM values. If this command is never executed (due to a blank table) the 
-		 pwm ISR wont update when the updateISR method is called */	
-		
-        /*			
-			pwmIsrData.tableA[0].command = ePwmCommand_ALLOFF;
-			pwmIsrData.tableA[0].deltaTime = PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT;
-			pwmIsrData.tableA[0].waitInISR = false;
-		*/
-		
-		memcpy((void *)pwmIsrData.tableA,(const void *)pwmInit,sizeof(pwmInit));
-		pwmIsrData.changeTable = false; //Dont change the table until updateISR is called.		
-												
-		pwmIsrData.enabled = false; //Enable the ISR routine.
-		
-		for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;																					
+			pwmIsrData.changeTable =  false;
+			pwmIsrData.enabled =  true;
+			memcpy((void *)pwmIsrData.tableA,(const void *)pwmInit,sizeof(pwmInit));					
+			for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;		
+			_updateOutstanding = false;																			
 	}
 
 
@@ -301,30 +311,10 @@
 	{
 		cli();
 		
-			boardInit(); //Part of ESC include file, sets up the output pins.
-			lowSideOff();
-			highSideOff();
-			//_delay_ms(100);
-		//Initialize ISR Data 
-		/*	pwmIsrData.pTableStart = pwmIsrData.tableA;
-			pwmIsrData.isActiveTableA = true;
-			pwmIsrData.changeTable = false;
-			pwmIsrData.pEntry =  pwmIsrData.tableA;
-			pwmIsrData.pTableStart = 	 pwmIsrData.tableA;
-			pwmIsrData.enabled = false;
-			
-	*/	
+		boardInit(); //Part of ESC include file, sets up the output pins.
+		lowSideOff();
+		highSideOff();
 		
-									
-			
-	/*	set_pwm(bldcPwm::ePwmChannel_A,900);
-		set_pwm(bldcPwm::ePwmChannel_B,600);
-		set_pwm(bldcPwm::ePwmChannel_C,300);
-			
-		update();  //Initialize the pwmIsrData.table  */
-		
-		//_delay_ms(100);
-		_delay_ms(500);
 		// Reset timer
 		TCCR1A = 0;
 		TCCR1B = 0;
@@ -339,13 +329,8 @@
 		TCCR1B |= _BV(WGM12); // Turn on CTC mode for timer 1				
 		TCCR1B |= _BV(CS10); // Set for no prescaler (Timer Freq = 16Mhz)		
 		TIMSK |= _BV(OCIE1A); // Enable timer compare interrupt		
-		TIFR |= _BV(OCF1A); // Clear any pending interrupts
-		
-		pwmIsrData.enabled = true;
-	//	_delay_ms(100);
-		_delay_ms(500);
-		sei();	
-			_delay_ms(500);		
+		TIFR = _BV(OCF1A); // Clear any pending interrupts		
+		sei();					
 	//	_delay_ms(100);
 	}
 
@@ -360,10 +345,19 @@
 	****************************************************************************/		
 	void  bldcPwm::updateISR(void)
 	{
+		
 	
-		if (busy()) return;	
+		//if (busy()) return;	
+		
+		
+		//uint8_t sreg = SREG;
+		//cli();
+		
+		if (pwmIsrData.changeTable) return;
+		DEBUG_OUT(0x0E);
+		
 
-		static pwmSortList_T sortList[ePwmCommand_END_OF_ENUM];
+		static pwmSortList_T sortList[8];
 			/**< A temporary list which information on each ISR command and its absolute
 			 * time. Includes addition fields which support list sorting. A list of commands
 			 * is made here first, sorted, and then finally exported to the ISR data structure. 
@@ -385,15 +379,18 @@
              * deltaTime while populating the ISR data structure. Using are in counts. */
 		
 						
-		
-		for (uint8_t n=0;n<ePwmCommand_END_OF_ENUM;n++)
+		DEBUG_OUT(0x01);
+		for (uint8_t n=0;n<=6;n++)
 		{
 			sortList[n].command = (pwmCommand_T)n;
 			sortList[n].pNextEntry = &sortList[n+1];
 		}
-		sortList[ePwmCommand_ALLOFF].pNextEntry = 0; //Mark the end of the linked list.
 		
-
+		//Last entry is a unique case because the next entry pointer is null.
+		sortList[7].pNextEntry = 0; //Mark the end of the linked list.
+		sortList[7].command = ePwmCommand_ALLOFF;
+		
+		DEBUG_OUT(0x02);
 		
 		//---------------------------------------------------------------------------------
 		// COVVERT FROM DUTY CYCLE TO TIMER EXPIRATION
@@ -404,6 +401,9 @@
 			timerCount = (timerCount >=(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT)? (PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT-1):timerCount);					
 			_pwmChannel[channel].timerCount = timerCount;
 		}
+		
+		DEBUG_OUT(0x03);
+		
 
 		//---------------------------------------------------------------------------------
 		// POPULATE THE ABSOLUTE TIMES FOR START AND ALLOFF
@@ -420,7 +420,10 @@
 		sortList[ePwmCommand_LOWB].absoluteCount = _pwmChannel[ePwmChannel_B].timerCount + FET_SWITCH_TIME_CNT;		
 		sortList[ePwmCommand_OFFC].absoluteCount = _pwmChannel[ePwmChannel_C].timerCount;
 		sortList[ePwmCommand_LOWC].absoluteCount = _pwmChannel[ePwmChannel_C].timerCount + FET_SWITCH_TIME_CNT;		
-						
+				
+				
+		DEBUG_OUT(0x04);
+				
 		//---------------------------------------------------------------------------------
 		// SORT THE LIST
 		//---------------------------------------------------------------------------------
@@ -432,13 +435,15 @@
 
 		bool touchedFlag; ///<true if the list order was changed at all	
 		do {
+			DEBUG_OUT(0x05);
 			linkPosition = 0;
 			pSortEntry = sortList[0].pNextEntry; 
 				/* Skipping first entry, The head is always the first element. See note above. */
 			pPreviousEntry = sortList; //Since current entry is seconds element, previous is first
 				
 		    touchedFlag = false; //true if the list order was changed at all
-			do {				
+			do {
+				DEBUG_OUT(0x06);				
 				if (pSortEntry->absoluteCount > pSortEntry->pNextEntry->absoluteCount) {	
 					
 					pwmSortList_T* pTemp =pSortEntry->pNextEntry->pNextEntry;
@@ -453,13 +458,16 @@
 				linkPosition++;
 
 				
-			}while (pSortEntry->pNextEntry->pNextEntry != 0);
+			}while (linkPosition < 6 );
 				/* Remember that the last position has a pNextEntry of 0.
 				 * If the we are at the second to last list position, no need to 
 				 * compare it with the last because by definition, nothing comes 
 				 * after the ePwmCommand_ALLOFF which was already placed there. */
 
 		} while (touchedFlag);
+			
+			
+	
 				
 		//---------------------------------------------------------------------------------
 		// LOAD THE LIST INTO THE ISR DATA STRUCTURE
@@ -489,6 +497,7 @@
 			pSortEntry = pSortEntry->pNextEntry;					
 		}
 		
+	
 		
 		//---------------------------------------------------------------------------------
 		// TELL THE ISR TO SWITCH TO THE TABLE WE JUST CREATED
@@ -501,6 +510,7 @@
 		}
 		SREG = sreg; //Restore Interrupt State		
 		_updateOutstanding = false;	
+		DEBUG_OUT(0x0E);
 	}
 	
 	
@@ -515,10 +525,11 @@
 	****************************************************************************/	
 	bool bldcPwm::busy(void)
 	{
-		bool retVal;				
+		bool retVal;	
+		uint8_t sregVal = SREG;			
 		cli();
 		retVal = pwmIsrData.changeTable;
-		sei();
+		SREG = sregVal;
 		return retVal;
 				
 	}

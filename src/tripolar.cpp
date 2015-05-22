@@ -11,9 +11,20 @@
 #include <avr/pgmspace.h>
 #include "bldcPwm.h"
 
+
+
+
+#define DO_DEBUG
+#include "afro_nfet.h"
+#include "fets.h"
+
+#include <util/delay.h>
+
 void setup(void);
 void loop(void);
 void incrementRotor(void);
+
+
 
 
 	/*****************************************************************************/
@@ -28,10 +39,10 @@ void incrementRotor(void);
      *      at the top and bottom. This may have been intentional, or this 
      *      might be something we need to investigate.							*/
 	/****************************************************************************/	
+	//static const uint8_t pwmSin[2] = {0,1};
 	
-	
-	static const uint8_t pwmSin[256]  = 	    			 															
-	//static const uint8_t pwmSin[256] PROGMEM = 	
+	//static const uint8_t pwmSin[256]  = 	    			 															
+	static const uint8_t pwmSin[256]  = 	
 	{
 				128, 	131, 	134, 	137, 	140, 	143, 	146, 	149, 	152, 	156, 	//	0	 to 	9
 				159, 	162, 	165, 	168, 	171, 	174, 	176, 	179, 	182, 	185, 	//	10	 to 	19
@@ -59,7 +70,7 @@ void incrementRotor(void);
 				51, 	54, 	56, 	59, 	62, 	64, 	67, 	70, 	73, 	76, 	//	230	 to 	239
 				79, 	81, 	84, 	87, 	90, 	93, 	96, 	99, 	103, 	106, 	//	240	 to 	249
 				109, 	112, 	115, 	118, 	121, 	124										//	250	 to 	255		
-	};
+	}; 
 	
 #define SINE_ARRAY_SIZE 255
 #define PHASE_SHIFT  85
@@ -68,8 +79,52 @@ bldcPwm motorPwm;
 
 int main(void)
 {
+	boardInit();
+	cli();
+	redOff();
+	greenOff();
+	DEBUG_OUT(0x00);
+	_delay_ms(25);
+	for (uint8_t n=0;n<=0x0F;n++)
+	{
+
+			DEBUG_OUT(n);
+			_delay_ms(10);
+	}
+	_delay_ms(25);	
+	DEBUG_OUT(0x00);
+	_delay_ms(25);
 	
 	//_delay_ms(1000);
+	
+/*	
+do 
+
+
+{
+
+ApFETOn();
+BpFETOn();
+CpFETOn();
+_delay_ms(10);
+ApFETOff();
+_delay_ms(10);
+AnFETOn();
+_delay_ms(10);
+BpFETOff();
+_delay_ms(10);
+BnFETOn();
+_delay_ms(10);
+CpFETOff();
+_delay_ms(10);
+CnFETOn();
+_delay_ms(10);
+lowSideOff();
+_delay_ms(10);	
+
+}while(1);
+*/
+	
 	setup();
 	
 	
@@ -84,13 +139,15 @@ int main(void)
 
 void setup(void)
 {
-	
+	DEBUG_OUT(0x01);
 	motorPwm.begin();
+	DEBUG_OUT(0x02);
 	
 	/*motorPwm.set_pwm(bldcPwm::ePwmChannel_A,900);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,600);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,300);
 	motorPwm.update(); */
+
 }
 
 
@@ -100,28 +157,30 @@ void loop(void)
 	static int16_t loopCount = 0;
 	static bool done = false;
 	static bool enabled = true;
+	
+	DEBUG_OUT(0x03);
 	loopCount++;
 	
 	motorPwm.tickle();
 	//incrementRotor();
-
+	DEBUG_OUT(0x04);
 
 	if (loopCount >=100)
 	{
+		
+		
 		incrementRotor();
 		done = true;
 		loopCount = 0;	
 		//enabled = !enabled;
 		//motorPwm.isrEnable(enabled);
 		
+		
 	} 
 
 	
-	
+	DEBUG_OUT(0x05);
 }
-
-
-
 
 
 
@@ -132,8 +191,8 @@ void incrementRotor(void)
    uint8_t indexA,indexB,indexC;
 
    
-   
-   indexA = currentStep += 1;
+   currentStep++;
+   indexA = currentStep;
    indexB = currentStep + PHASE_SHIFT;
    indexC = indexB + PHASE_SHIFT;
    

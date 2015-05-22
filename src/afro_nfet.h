@@ -47,8 +47,41 @@
 #define	O_GROUND	33
 
 #define	INIT_PC		(1<<i2c_clk)+(1<<i2c_data)
-#define	DIR_PC		0
 
+#ifdef DO_DEBUG
+	#define	DIR_PC		(1<<green_led) + (1<<red_led) + (1<<i2c_clk) + (1<<i2c_data)
+	//i2c lines used as debugging outputs temporarily.
+	
+	#define DEBUG_MASK_D 0x03 //00111100 green led,red Led,data and clock	
+	#define DEBUG_MASK_C 0x30 //00111100 green led,red Led,data and clock	
+	
+	
+	inline  void DEBUG_OUT(uint8_t X) 
+	/**< Send 4 bit number out pins for debugging. As follows:
+	 *   MSB [SCL] [SDA] [TXD] [RXD] LSB */	
+		{
+			uint8_t portVal;
+		
+			portVal = X & 0x03;									
+			PORTD &= ~(DEBUG_MASK_D & ~portVal); //Dont clear bit that we know we will set or are not part of the mask.
+			PORTD |= portVal;
+			
+			portVal = X & 0x0C;	
+			portVal = portVal << 2;		
+			PORTC &= ~(DEBUG_MASK_C & ~portVal);
+			PORTC |= portVal;
+		}			
+#else
+	#define DIR_PC (1<<green_led) + (1<<red_led)
+	inline void DEBUG_OUT(uint8_t X) {}
+#endif
+
+
+inline void redOn(){PORTC &= ~_BV(red_led);}
+inline void redOff(){PORTC |= _BV(red_led);}
+inline void greenOn(){PORTC &= ~_BV(green_led);}
+inline void greenOff(){PORTC |= _BV(green_led);}
+	
 /*.MACRO RED_on
 	sbi	DDRC, red_led
 .ENDMACRO
@@ -72,8 +105,15 @@
 #define	txd		  1
 #define	rxd		  0
 
-#define	INIT_PD		(1<<ApFET)+(1<<txd)
-#define	DIR_PD		(1<<AnFET)+(1<<BnFET)+(1<<CnFET)+(1<<ApFET)+(1<<txd)
+
+
+#ifndef DO_DEBUG
+	#define	DIR_PD		(1<<AnFET)+(1<<BnFET)+(1<<CnFET)+(1<<ApFET)+(1<<txd)
+	#define	INIT_PD		(1<<ApFET)+(1<<txd)
+#else
+	#define	DIR_PD		(1<<AnFET)+(1<<BnFET)+(1<<CnFET)+(1<<ApFET)+(1<<txd)+(1<<rxd)
+	#define	INIT_PD		(1<<ApFET)+(1<<txd)
+#endif
 
 #define	AnFET_port	PORTD
 #define	BnFET_port	PORTD
