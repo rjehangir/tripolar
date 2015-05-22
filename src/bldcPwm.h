@@ -26,7 +26,7 @@
 			 * duty cycle equivelent. The set_pwm method will accept duty cycles between 0 and this number,
 			 * where kDutyCycleFullScale is 100% duty cycle.												*/
 			
-	#define  kFetSwitchTime_uS 10
+	#define  kFetSwitchTime_uS 20
 			/**< Fet Turn on Time in micro-seconds. FETS do not switch on or off instantly. There will be a
 			 * delay from the time that we initiate turning off a fet, to the time that the FET is truly off.
 			 * Since the we running half H bridges, a condition where both the high and low side FET are 
