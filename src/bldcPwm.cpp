@@ -451,6 +451,7 @@
 					pSortEntry->pNextEntry->pNextEntry = pSortEntry;     //guy after me points to me
 					pSortEntry->pNextEntry = pTemp;						 //I point to what guy after me WAS pointing too					
 					touchedFlag = true;	 //We made a change, so this sort needs to run at least once more
+					linkPosition++; //By swapping, we are also one link position up.
 				}
 				
 				pPreviousEntry = pSortEntry;				
@@ -458,7 +459,7 @@
 				linkPosition++;
 
 				
-			}while (linkPosition < 6 );
+			}while (linkPosition <5 );
 				/* Remember that the last position has a pNextEntry of 0.
 				 * If the we are at the second to last list position, no need to 
 				 * compare it with the last because by definition, nothing comes 
