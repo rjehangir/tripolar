@@ -14,10 +14,10 @@
 
 
 
-#define DO_DEBUG
+//#define DO_DEBUG
 #include "afro_nfet.h"
 #include "fets.h"
-
+#define F_CPU 16000000UL
 #include <util/delay.h>
 
 void setup(void);
@@ -82,49 +82,46 @@ int main(void)
 	boardInit();
 	cli();
 	redOff();
-	greenOff();
+	greenOn();
 	DEBUG_OUT(0x00);
-	_delay_ms(25);
+	//_delay_ms(500);
 	for (uint8_t n=0;n<=0x0F;n++)
 	{
 
 			DEBUG_OUT(n);
 			_delay_ms(10);
 	}
-	_delay_ms(25);	
+	_delay_ms(500);	
 	DEBUG_OUT(0x00);
-	_delay_ms(25);
+	//_delay_ms(25);
 	
 	//_delay_ms(1000);
 	
-/*	
-do 
-
-
-{
+/*
+do {
 
 ApFETOn();
 BpFETOn();
 CpFETOn();
-_delay_ms(10);
+_delay_ms(500);
 ApFETOff();
-_delay_ms(10);
+_delay_ms(1);
 AnFETOn();
-_delay_ms(10);
+_delay_ms(500);
 BpFETOff();
-_delay_ms(10);
+_delay_ms(1);
 BnFETOn();
-_delay_ms(10);
+_delay_ms(500);
 CpFETOff();
-_delay_ms(10);
+_delay_ms(1);
 CnFETOn();
-_delay_ms(10);
+_delay_ms(500);
 lowSideOff();
-_delay_ms(10);	
+_delay_ms(1);	
 
 }while(1);
-*/
-	
+
+	*/
 	setup();
 	
 	
@@ -142,6 +139,7 @@ void setup(void)
 	DEBUG_OUT(0x01);
 	motorPwm.begin();
 	DEBUG_OUT(0x02);
+	//incrementRotor();
 	
 	/*motorPwm.set_pwm(bldcPwm::ePwmChannel_A,900);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,600);
@@ -166,16 +164,9 @@ void loop(void)
 	DEBUG_OUT(0x04);
 
 	if (loopCount >=100)
-	{
-		
-		
-		incrementRotor();
-		done = true;
-		loopCount = 0;	
-		//enabled = !enabled;
-		//motorPwm.isrEnable(enabled);
-		
-		
+	{				
+		incrementRotor();						
+		loopCount = 0;
 	} 
 
 	
@@ -186,7 +177,7 @@ void loop(void)
 
 void incrementRotor(void)
 {
-	static uint8_t currentStep = 0;	
+   static uint8_t currentStep = 0;	
    uint16_t pwmA,pwmB,pwmC;		
    uint8_t indexA,indexB,indexC;
 

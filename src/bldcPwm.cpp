@@ -110,8 +110,13 @@
 				volatile bool enabled; 
 					/**< When true, the ISR will run, when false, the ISR will return without 
 						*	doing anything.		
-						*  DEFAULT: false																		*/		
-				uint16_t startTime; //Timer value when 		
+						*  DEFAULT: false																	*/		
+				uint16_t startTime; //Timer value when 	
+				bool commandDone[8];
+					/**<True if it's corresponding command was already executed within the PWM cycle.
+					 * Each element corresponds to a pwmCommand_E, where each member of pwmCommand_E is
+					 * its own index into the array.														*/
+				
 			}pwmIsrData_T;									
 				
 									
@@ -127,14 +132,14 @@
 	  pwmEntry_T IsrCurrentEntry;
 	  
 	  const pwmEntry_T pwmInit[8] =  {		  
-									  {(bldcPwm::pwmCommand_T) 0,	100	,	1},
-									  {(bldcPwm::pwmCommand_T)5,	500,	0},
-									  {(bldcPwm::pwmCommand_T)6,	100,	1},
-									  {(bldcPwm::pwmCommand_T)3, 4000, 0},
-									  {(bldcPwm::pwmCommand_T)4,100,1},
-									  {(bldcPwm::pwmCommand_T)1,4000,0},
-									  {(bldcPwm::pwmCommand_T)2,100,1},
-									  {(bldcPwm::pwmCommand_T)7,2000,0}
+									  {(bldcPwm::pwmCommand_T) 0,	1600	,	1},
+									  {(bldcPwm::pwmCommand_T)5,	1600,	0},
+									  {(bldcPwm::pwmCommand_T)6,	1600,	1},
+									  {(bldcPwm::pwmCommand_T)3, 1600, 0},
+									  {(bldcPwm::pwmCommand_T)4,1600,1},
+									  {(bldcPwm::pwmCommand_T)1,1600,0},
+									  {(bldcPwm::pwmCommand_T)2,1600,1},
+									  {(bldcPwm::pwmCommand_T)7,1600,0}
 								  };
 	  
 
@@ -175,6 +180,7 @@
  		DEBUG_OUT(0x08);
 		redOn();
 		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.
+		bool orderError = false;
 		if (!pwmIsrData.enabled) return;
 		do {
 			DEBUG_OUT(0x09);
@@ -182,51 +188,71 @@
 			//DEBUG_OUT(pwmIsrData.pEntry->command);
 		
 		
-			
+			DEBUG_OUT(pwmIsrData.pEntry->command);
 			switch (pwmIsrData.pEntry->command)
 			{
 				case bldcPwm::ePwmCommand_START:
-					//_delay_ms(10);
-					ApFETOn();
-					BpFETOn();
-					CpFETOn();
-					incEntry = true;
+				//	_delay_ms(10);
+					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_ALLOFF]) {		//Check that all negative side fets were previously turned off
+						ApFETOn();
+						BpFETOn();
+						CpFETOn();
+						incEntry = true;						
+						break;
+					}
+					else {
+						orderError = true;
+					}
+					for (int n=0;n<8;n++) pwmIsrData.commandDone[n] = false;					
 					break;
 				case bldcPwm::ePwmCommand_OFFA:
 					ApFETOff();
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWA:
-					//_delay_ms(10);
-					AnFETOn();
-					incEntry = true;
+				//	_delay_ms(10);
+					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_ALLOFF]) {		//Check that all negative side fets were previously turned off
+						AnFETOn();					
+						incEntry = true;
+						break;
+					}
+					orderError = true;
 					break;
 				case bldcPwm::ePwmCommand_OFFB:
 					BpFETOff();
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWB:
-					//_delay_ms(10);
-					BnFETOn();
-					incEntry = true;
+				//	_delay_ms(10);
+					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_OFFB]) { //check BpFET was turned off already
+						BnFETOn();
+						incEntry = true;
+						break;
+					}
+					orderError = true;
 					break;
 				case bldcPwm::ePwmCommand_OFFC:
 					CpFETOff();
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWC:
-					//_delay_ms(10);
-					CnFETOn();
-					incEntry = true;
+				//	_delay_ms(10);
+					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_OFFC]) { //check CpFET was turned off already
+						CnFETOn();
+						incEntry = true;
+						break;
+					}
+					orderError = true;
 					break;
 				case bldcPwm::ePwmCommand_ALLOFF:
-					//AnFETOff();
-					//highSideOff();
-					lowSideOff();
-				
+					AnFETOff();
+					BnFETOff();
+					CnFETOff();
+													
 					if (pwmIsrData.changeTable == true)  //If user has requested a change of tables then ...
 					{
 						DEBUG_OUT(0x0A);
+						_delay_us(200);
 						pwmIsrData.pTableStart = (pwmIsrData.isActiveTableA ? pwmIsrData.tableA : pwmIsrData.tableB);										
 							/* Go to the beginning of the next table */
 						pwmIsrData.changeTable = false;															
@@ -246,6 +272,13 @@
 					break;					
 			}
 			
+			if (orderError) {
+				DEBUG_OUT(0xFD);
+				_delay_ms(10);
+			}
+			
+			pwmIsrData.commandDone[pwmIsrData.pEntry->command] = true;
+						
 			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
 			
@@ -255,6 +288,7 @@
 			TCNT1 = 0;
 			//TIFR = _BV(OCF1A); // Clear any pending interrupts 				
 			DEBUG_OUT(0x0B);
+			//_delay_us(100);
 			break;
 			if (! pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
 			
@@ -294,6 +328,10 @@
 			pwmIsrData.pEntry =  pwmIsrData.tableA;
 			pwmIsrData.changeTable =  false;
 			pwmIsrData.enabled =  true;
+			pwmIsrData.commandDone[bldcPwm::ePwmCommand_ALLOFF] = true; 
+				/*This is checked in ISR during ePwmCommand_START we need to trick the 
+				 * check to see that ePwmCommand_ALLOFF was already run the very first time
+				 * the ISR runs, or it will flag an error */
 			memcpy((void *)pwmIsrData.tableA,(const void *)pwmInit,sizeof(pwmInit));					
 			for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;		
 			_updateOutstanding = false;																			
@@ -311,7 +349,7 @@
 	{
 		cli();
 		
-		boardInit(); //Part of ESC include file, sets up the output pins.
+	//	boardInit(); //Part of ESC include file, sets up the output pins.
 		lowSideOff();
 		highSideOff();
 		
@@ -395,10 +433,11 @@
 		//---------------------------------------------------------------------------------
 		// COVVERT FROM DUTY CYCLE TO TIMER EXPIRATION
 		//---------------------------------------------------------------------------------				
+		#define MAX_PWM_CHANNEL PWM_CYCLE_CNT - (2*FET_SWITCH_TIME_CNT)
 		for (uint16_t channel = 0; channel <3;channel++)
 		{
 			uint16_t timerCount = pwmDuration_cnt(_pwmChannel[channel].dutyCycle);					
-			timerCount = (timerCount >=(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT)? (PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT-1):timerCount);					
+			timerCount = (timerCount >=MAX_PWM_CHANNEL? MAX_PWM_CHANNEL-1:timerCount);					
 			_pwmChannel[channel].timerCount = timerCount;
 		}
 		
