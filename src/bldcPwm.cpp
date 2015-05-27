@@ -252,7 +252,7 @@
 					if (pwmIsrData.changeTable == true)  //If user has requested a change of tables then ...
 					{
 						DEBUG_OUT(0x0A);
-						_delay_us(200);
+						//_delay_us(200);
 						pwmIsrData.pTableStart = (pwmIsrData.isActiveTableA ? pwmIsrData.tableA : pwmIsrData.tableB);										
 							/* Go to the beginning of the next table */
 						pwmIsrData.changeTable = false;															
@@ -274,7 +274,7 @@
 			
 			if (orderError) {
 				DEBUG_OUT(0xFD);
-				_delay_ms(10);
+				_delay_ms(100);
 			}
 			
 			pwmIsrData.commandDone[pwmIsrData.pEntry->command] = true;
