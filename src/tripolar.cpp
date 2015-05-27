@@ -163,7 +163,7 @@ void loop(void)
 	//incrementRotor();
 	DEBUG_OUT(0x04);
 
-	if (loopCount >=20000)
+	if (loopCount >=100)
 	{				
 		incrementRotor();						
 		loopCount = 0;
@@ -193,9 +193,9 @@ void incrementRotor(void)
   // pwmC = pgm_read_byte_near(pwmSin + indexC) * 4;
   
  
-  pwmA = pwmSin[59]*4;
-  pwmB = pwmSin[59]*4;
-  pwmC = pwmSin[59]*4;
+  pwmA = pwmSin[indexA]*4;
+  pwmB = pwmSin[indexB]*4;
+  pwmC = pwmSin[indexC]*4;
    
   
  

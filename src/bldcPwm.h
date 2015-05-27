@@ -36,7 +36,7 @@
 			 * between the time that we turn one fet on an h bridge off and the time that we turn the other
 			 * FET (on the same HBridge) on.																*/
 			
-#define  kMinTimerDelta_uS  5
+#define  kMinTimerDelta_uS  10
 			/**< Minimum Time Delta required for PWM ISR Exit in micro seconds. 
 			 * When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
 			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 

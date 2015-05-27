@@ -201,31 +201,23 @@ bool checkISRData(pwmEntry_T  *table);
 			switch (pwmIsrData.pEntry->command)
 			{
 				case bldcPwm::ePwmCommand_START:
-				//	_delay_ms(10);
-					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_ALLOFF]) {		//Check that all negative side fets were previously turned off
+				
 						ApFETOn();
 						BpFETOn();
 						CpFETOn();
 						incEntry = true;						
-						break;
-					}
-					else {
-						orderError = true;
-					}
-					for (int n=0;n<8;n++) pwmIsrData.commandDone[n] = false;					
-					break;
+						break;									
+					
 				case bldcPwm::ePwmCommand_OFFA:
 					ApFETOff();
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWA:
 				//	_delay_ms(10);
-					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_ALLOFF]) {		//Check that all negative side fets were previously turned off
+					
 						AnFETOn();					
 						incEntry = true;
-						break;
-					}
-					orderError = true;
+					
 					break;
 				case bldcPwm::ePwmCommand_OFFB:
 					BpFETOff();
@@ -233,26 +225,22 @@ bool checkISRData(pwmEntry_T  *table);
 					break;
 				case bldcPwm::ePwmCommand_LOWB:
 				//	_delay_ms(10);
-					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_OFFB]) { //check BpFET was turned off already
+					
 						BnFETOn();
 						incEntry = true;
 						break;
-					}
-					orderError = true;
-					break;
+					
 				case bldcPwm::ePwmCommand_OFFC:
 					CpFETOff();
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWC:
-				//	_delay_ms(10);
-					if (pwmIsrData.commandDone[bldcPwm::ePwmCommand_OFFC]) { //check CpFET was turned off already
+				
 						CnFETOn();
 						incEntry = true;
 						break;
-					}
-					orderError = true;
-					break;
+				
+				
 				case bldcPwm::ePwmCommand_ALLOFF:
 					AnFETOff();
 					BnFETOff();
@@ -281,25 +269,25 @@ bool checkISRData(pwmEntry_T  *table);
 					break;					
 			}
 			
-			if (orderError) {
-				DEBUG_OUT(0xFD);
-				_delay_ms(100);
-			}
 			
-			pwmIsrData.commandDone[pwmIsrData.pEntry->command] = true;
+			
+			
 						
 			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
-			
+				
 			if (!pwmIsrData.pEntry->waitInISR)
 			{				
 				OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-				TCNT1 = 0;
+				TCNT1 = 0;	
 				TIFR = _BV(OCF1A); // Clear any pending interrupts 		
 				break;
-			}				
-			while (OCR1A <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.	
-			TCNT1 = 0;										
+			}	
+			
+			
+			TCNT1 = 0;				
+			while (TCNT1 <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.	
+			
 		}
 		
 		//   <========== !!!!!!! CLEAR THE INTERRUPT SOURCE !!!!!!!!
