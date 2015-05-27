@@ -50,6 +50,17 @@
 */
 
 	
+			/************************************************************************************************/
+			/* ENUM: isrExitMode_E																			*/
+			/** Specifies the action to take when exiting the pwm ISR.										*/
+			/************************************************************************************************/
+			typedef enum isrExitMode_E
+			{
+				isrExitMode_Exit, ///< Exit ISR when completed, and handle next edge after reentry.
+				isrExitMode_Wait, ///< Do not exit ISR,but stop and wait for timer to expire, then loop to beginning.
+				isrExitMode_Loop  ///< Do not exit ISR and loop immediately to handle next edge without waiting.
+			}pwmExitMode_T;
+	
 
 			/************************************************************************************************/
 			/* STRUCT: pwmEntry_S																			*/
@@ -63,13 +74,16 @@
 				volatile uint16_t	deltaTime; 
 					/**< What value the timer should be at when this command is executed. This is referenced
 						* as a delta from the time that the previous command was executed.					*/	
-				bool waitInISR; 
+				//bool waitInISR; 
 					/**<set to true if deltaTime is so small that we risk missing the next ISR.					
 						* If set to true, the ISR will not exit on the previous entry, and instead,
 						* wait within the ISR for the next time to occur.									*/
+					
+				pwmExitMode_T exitMode; //Controls completion behavior at end of ISR. See pwmExitMode_T.
 			}pwmEntry_T;
 		
 		
+			
 		
 		
 			/************************************************************************************************/
@@ -111,13 +125,10 @@
 					/**< When true, the ISR will run, when false, the ISR will return without 
 						*	doing anything.		
 						*  DEFAULT: false																	*/		
-				uint16_t startTime; //Timer value when 	
-				bool commandDone[8];
-					/**<True if it's corresponding command was already executed within the PWM cycle.
-					 * Each element corresponds to a pwmCommand_E, where each member of pwmCommand_E is
-					 * its own index into the array.														*/
-				
-			}pwmIsrData_T;									
+				//uint16_t startTime; //Timer value when 	
+
+			}pwmIsrData_T;		
+			
 				
 									
 
@@ -132,14 +143,14 @@
 	  pwmEntry_T IsrCurrentEntry;
 	  
 	  const pwmEntry_T pwmInit[8] =  {		  
-									  {(bldcPwm::pwmCommand_T) 0,	1600	,	1},
-									  {(bldcPwm::pwmCommand_T)5,	1600,	0},
-									  {(bldcPwm::pwmCommand_T)6,	1600,	1},
-									  {(bldcPwm::pwmCommand_T)3, 1600, 0},
-									  {(bldcPwm::pwmCommand_T)4,1600,1},
-									  {(bldcPwm::pwmCommand_T)1,1600,0},
-									  {(bldcPwm::pwmCommand_T)2,1600,1},
-									  {(bldcPwm::pwmCommand_T)7,1600,0}
+									  {(bldcPwm::pwmCommand_T) 0,	1600,	isrExitMode_Exit},
+									  {(bldcPwm::pwmCommand_T)5,	1600,	isrExitMode_Exit},
+									  {(bldcPwm::pwmCommand_T)6,	1600,	isrExitMode_Exit},
+									  {(bldcPwm::pwmCommand_T)3,	1600,	isrExitMode_Exit},
+									  {(bldcPwm::pwmCommand_T)4,	1600,	isrExitMode_Exit},
+									  {(bldcPwm::pwmCommand_T)1,	1600,	isrExitMode_Exit},
+									  {(bldcPwm::pwmCommand_T)2,	1600,	isrExitMode_Exit},
+									  {(bldcPwm::pwmCommand_T)7,	1600,	isrExitMode_Exit}
 								  };
 
 /*
@@ -275,19 +286,26 @@ bool checkISRData(pwmEntry_T  *table);
 						
 			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
-				
-			if (!pwmIsrData.pEntry->waitInISR)
-			{				
-				OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-				TCNT1 = 0;	
-				TIFR = _BV(OCF1A); // Clear any pending interrupts 		
-				break;
-			}	
 			
-			
-			TCNT1 = 0;				
-			while (TCNT1 <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.	
-			
+			if (pwmIsrData.pEntry->exitMode != isrExitMode_Loop)
+			{
+				if (pwmIsrData.pEntry->exitMode  == isrExitMode_Exit)
+				{
+					OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
+					//TCNT1 = 0;
+					//TIFR = _BV(OCF1A); // Clear any pending interrupts
+					break;
+				}
+				else
+				{
+					
+					//while (TCNT1 <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.
+					while ((TIFR & _BV(OCF1A)) == 0)  asm(" ");
+					
+				}
+			}
+			TCNT1 = 0;
+	
 		}
 		
 		//   <========== !!!!!!! CLEAR THE INTERRUPT SOURCE !!!!!!!!
@@ -321,10 +339,7 @@ bool checkISRData(pwmEntry_T  *table);
 			pwmIsrData.pEntry =  pwmIsrData.tableA;
 			pwmIsrData.changeTable =  false;
 			pwmIsrData.enabled =  true;
-			pwmIsrData.commandDone[bldcPwm::ePwmCommand_ALLOFF] = true; 
-				/*This is checked in ISR during ePwmCommand_START we need to trick the 
-				 * check to see that ePwmCommand_ALLOFF was already run the very first time
-				 * the ISR runs, or it will flag an error */
+			
 			memcpy((void *)pwmIsrData.tableA,(const void *)pwmInit,sizeof(pwmInit));					
 			for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;		
 			_updateOutstanding = false;																			
@@ -515,20 +530,31 @@ bool checkISRData(pwmEntry_T  *table);
 		//where we will then skip it.
 		pIsrScriptEntry->command = ePwmCommand_START;
 		pIsrScriptEntry->deltaTime = FET_SWITCH_TIME_CNT;
-		pIsrScriptEntry->waitInISR = true;
-		pIsrScriptEntry++;	//Move to second entry
+
 		
-		pSortEntry = (pwmSortList_T *)sortList[0].pNextEntry; //Reset pointer to second entry (skipping START command).
+		//pIsrScriptEntry++;	//Move to second entry
 		
-		for (int n=1;n<8;n++)
-		{			
-			pIsrScriptEntry->command = (pwmCommand_T)pSortEntry->command;
-			pIsrScriptEntry->deltaTime = pSortEntry->absoluteCount - totalTime;
-			if (pIsrScriptEntry->deltaTime <= MIN_TIMER_OCR_CNT ) pIsrScriptEntry->waitInISR = true;
+		pSortEntry = (pwmSortList_T *)sortList; //Reset pointer to first entry
+		
+		for (int n=0;n<8;n++)
+		{	
+			if (n!=0){
+				pIsrScriptEntry->command = (pwmCommand_T)pSortEntry->command;
+				pIsrScriptEntry->deltaTime = pSortEntry->absoluteCount - totalTime;
+			}
+			
+			if (pIsrScriptEntry->deltaTime <= ISR_LOOP_CNT ) pIsrScriptEntry->exitMode = isrExitMode_Loop;
+			else if (pIsrScriptEntry->deltaTime <= MIN_TIMER_OCR_CNT ) pIsrScriptEntry->exitMode = isrExitMode_Wait;
+			else pIsrScriptEntry->exitMode = isrExitMode_Exit;
+
+			
+			
+									
 			totalTime += pIsrScriptEntry->deltaTime;
 			pIsrScriptEntry++;	
 			pSortEntry = pSortEntry->pNextEntry;					
 		}
+		
 		
 	
 		

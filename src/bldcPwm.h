@@ -36,7 +36,7 @@
 			 * between the time that we turn one fet on an h bridge off and the time that we turn the other
 			 * FET (on the same HBridge) on.																*/
 			
-#define  kMinTimerDelta_uS  10
+#define  kMinTimerDelta_uS  20
 			/**< Minimum Time Delta required for PWM ISR Exit in micro seconds. 
 			 * When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
 			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
@@ -45,7 +45,11 @@
 			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
 			
-#define PWM_FREQ_KHZ 3
+#define ISR_LOOP_US 12
+			/**< When deltaTime is below this value, the ISR will loop too handle the next edge without 
+			 * exiting the ISR, and without waiting for the timer to expire.								*/
+			
+#define PWM_FREQ_KHZ 1
 			/**< Pwm Frequency in Tenths of A KiloHertz.
 			 *  When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
 			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
@@ -77,6 +81,10 @@
 	 /**< kFetSwitchTime_uS converted to timer counts */
 #define  MIN_TIMER_OCR_CNT   ((uint16_t)(kMinTimerDelta_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
 	 /**< kMinTimerDelta_uS converted to timer counts  */
+	 
+	 
+#define ISR_LOOP_CNT  ((uint16_t)(ISR_LOOP_US*(PWM_TIMER_FREQ_KHZ/1000)) )
+
 #define  PWM_CYCLE_CNT	    ((uint16_t)((PWM_TIMER_FREQ_KHZ)/(PWM_FREQ_KHZ))	)
      /**<Number of timer counts in one PWM cycle */
 

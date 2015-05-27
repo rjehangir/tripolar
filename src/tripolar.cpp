@@ -192,18 +192,11 @@ void incrementRotor(void)
   // pwmB = pgm_read_byte_near(pwmSin + indexB) * 4;
   // pwmC = pgm_read_byte_near(pwmSin + indexC) * 4;
   
- 
-  pwmA = pwmSin[indexA]*4;
-  pwmB = pwmSin[indexB]*4;
-  pwmC = pwmSin[indexC]*4;
-   
   
- 
- 
- 
-
- 
- 
+   pwmA = pwmSin[indexA]*4;
+   pwmB = pwmSin[indexB]*4;
+   pwmC = pwmSin[indexC]*4;
+  
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,pwmA);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,pwmB);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,pwmC);				
