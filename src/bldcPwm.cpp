@@ -289,18 +289,21 @@ bool checkISRData(pwmEntry_T  *table);
 			
 			if (pwmIsrData.pEntry->exitMode != isrExitMode_Loop)
 			{
+				OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
 				if (pwmIsrData.pEntry->exitMode  == isrExitMode_Exit)
 				{
-					OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
+					
 					//TCNT1 = 0;
 					//TIFR = _BV(OCF1A); // Clear any pending interrupts
 					break;
 				}
 				else
 				{
-					OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
+					
 					//while (TCNT1 <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.
 					while ((TIFR & _BV(OCF1A)) == 0)  asm(" ");
+					OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
+					TIFR = _BV(OCF1A); // Clear any pending interrupts
 					
 				}
 			}
