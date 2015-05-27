@@ -26,7 +26,7 @@
 			 * duty cycle equivelent. The set_pwm method will accept duty cycles between 0 and this number,
 			 * where kDutyCycleFullScale is 100% duty cycle.												*/
 			
-	#define  kFetSwitchTime_uS 100
+	#define  kFetSwitchTime_uS 2
 			/**< Fet Turn on Time in micro-seconds. FETS do not switch on or off instantly. There will be a
 			 * delay from the time that we initiate turning off a fet, to the time that the FET is truly off.
 			 * Since the we running half H bridges, a condition where both the high and low side FET are 
@@ -45,7 +45,7 @@
 			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
 			
-#define PWM_FREQ_KHZ 1
+#define PWM_FREQ_KHZ 3
 			/**< Pwm Frequency in Tenths of A KiloHertz.
 			 *  When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
 			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
