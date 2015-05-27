@@ -89,9 +89,9 @@ int main(void)
 	{
 
 			DEBUG_OUT(n);
-			_delay_ms(10);
+			//_delay_ms(10);
 	}
-	_delay_ms(500);	
+	//_delay_ms(500);	
 	DEBUG_OUT(0x00);
 	//_delay_ms(25);
 	
@@ -163,7 +163,7 @@ void loop(void)
 	//incrementRotor();
 	DEBUG_OUT(0x04);
 
-	if (loopCount >=100)
+	if (loopCount >=1000)
 	{				
 		incrementRotor();						
 		loopCount = 0;
