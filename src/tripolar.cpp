@@ -163,7 +163,7 @@ void loop(void)
 	//incrementRotor();
 	DEBUG_OUT(0x04);
 
-	if (loopCount >=100)
+	if (loopCount >=1)
 	{				
 		incrementRotor();						
 		loopCount = 0;
