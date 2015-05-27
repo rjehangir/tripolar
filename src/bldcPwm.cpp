@@ -141,7 +141,14 @@
 									  {(bldcPwm::pwmCommand_T)2,1600,1},
 									  {(bldcPwm::pwmCommand_T)7,1600,0}
 								  };
-	  
+
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& FUNCTION PROTOTYPES
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/
+
+bool checkISRData(pwmEntry_T  *table);		  
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -177,12 +184,14 @@
 	/****************************************************************************************************/			
 	ISR(TIMER1_COMPA_vect) 
 	{
+		OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
  		DEBUG_OUT(0x08);
 		redOn();
 		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.
 		bool orderError = false;
+		bool doExit = false;
 		if (!pwmIsrData.enabled) return;
-		do {
+		for (int i=0;i<10;i++) {	//Repeat up to 11 times if deltaTime keeps being too short		
 			DEBUG_OUT(0x09);
 			
 			//DEBUG_OUT(pwmIsrData.pEntry->command);
@@ -282,25 +291,21 @@
 			//Go to next entry if the switch told us to.
 			if (incEntry) pwmIsrData.pEntry++;
 			
-			
-			TIFR = _BV(OCF1A); // Clear any pending interrupts 				
-			OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-			TCNT1 = 0;
-			//TIFR = _BV(OCF1A); // Clear any pending interrupts 				
-			DEBUG_OUT(0x0B);
-			//_delay_us(100);
-			break;
-			if (! pwmIsrData.pEntry->waitInISR) break; //If the expiration time is not too close, then exit ISR	
-			
-
-			while ((TIFR & _BV(OCF1A)) == 0)asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.		
-				
-		} while(1);
+			if (!pwmIsrData.pEntry->waitInISR)
+			{				
+				OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
+				TCNT1 = 0;
+				TIFR = _BV(OCF1A); // Clear any pending interrupts 		
+				break;
+			}				
+			while (OCR1A <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.	
+			TCNT1 = 0;										
+		}
 		
 		//   <========== !!!!!!! CLEAR THE INTERRUPT SOURCE !!!!!!!!
 		
 	redOff();	
-	DEBUG_OUT(0x00);	
+	DEBUG_OUT(0x0B);
 	}
 
 
@@ -513,7 +518,7 @@
 		// LOAD THE LIST INTO THE ISR DATA STRUCTURE
 		//---------------------------------------------------------------------------------	
 		pIsrScriptEntry  = (pwmIsrData.isActiveTableA ? pwmIsrData.tableB : pwmIsrData.tableA);	
-		
+		pwmEntry_T *tableHead  = pIsrScriptEntry;
 		
 		
 		//Start is a special case  because we want to make the deltaTime
@@ -550,9 +555,49 @@
 		}
 		SREG = sreg; //Restore Interrupt State		
 		_updateOutstanding = false;	
+		if  (!checkISRData(tableHead))
+		{
+			DEBUG_OUT(0x0D);
+			asm("NOP");
+		}
+		
 		DEBUG_OUT(0x0E);
 	}
 	
+	
+	
+	/*****************************************************************************
+	*  Function: checkISRData
+	*	Description:															 */
+   /**		Looks at the tableA or tableB structure and checks if the
+	*       array holds valid data.
+	* @param isTableA true if tableA, false if tableB 
+	* @return true if data is valid. False if problem 
+	****************************************************************************/	
+	bool checkISRData(pwmEntry_T  *table)	
+	{	
+		bool retVal = false;
+		bool commandCalled[8];
+		pwmEntry_T *p = table;
+		uint32_t totalCounts = 0;
+		
+		for (uint8_t n=0;n<8;n++) commandCalled[n]=false;
+		
+		for (uint8_t n=0;n<8;n++)
+		{
+			if (p->command ==  bldcPwm::ePwmCommand_LOWA && commandCalled[bldcPwm::ePwmCommand_OFFA] == false) return false;
+			if (p->command == bldcPwm::ePwmCommand_LOWB && commandCalled[bldcPwm::ePwmCommand_OFFB] == false) return false;
+			if (p->command == bldcPwm::ePwmCommand_LOWC && commandCalled[bldcPwm::ePwmCommand_OFFC] == false) return false;
+			totalCounts += p->deltaTime;
+			if (totalCounts > PWM_CYCLE_CNT) return false;
+			commandCalled[p->command ] = true;
+			p++;
+		}
+		
+		if (table[0].command != bldcPwm::ePwmCommand_START) return false;
+		if (table[7].command != bldcPwm::ePwmCommand_ALLOFF) return false;
+		return retVal;
+	}
 	
 	
 	

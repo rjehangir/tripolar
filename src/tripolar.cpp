@@ -91,11 +91,11 @@ int main(void)
 			DEBUG_OUT(n);
 			//_delay_ms(10);
 	}
-	//_delay_ms(500);	
+//	_delay_ms(500);	
 	DEBUG_OUT(0x00);
 	//_delay_ms(25);
 	
-	//_delay_ms(1000);
+//	_delay_ms(1000);
 	
 /*
 do {
@@ -163,7 +163,7 @@ void loop(void)
 	//incrementRotor();
 	DEBUG_OUT(0x04);
 
-	if (loopCount >=1000)
+	if (loopCount >=20000)
 	{				
 		incrementRotor();						
 		loopCount = 0;
@@ -192,11 +192,18 @@ void incrementRotor(void)
   // pwmB = pgm_read_byte_near(pwmSin + indexB) * 4;
   // pwmC = pgm_read_byte_near(pwmSin + indexC) * 4;
   
-  pwmA = pwmSin[indexA]*4;
-  pwmB = pwmSin[indexB]*4;
-  pwmC = pwmSin[indexC]*4;
+ 
+  pwmA = pwmSin[59]*4;
+  pwmB = pwmSin[59]*4;
+  pwmC = pwmSin[59]*4;
    
   
+ 
+ 
+ 
+
+ 
+ 
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_A,pwmA);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,pwmB);
 	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,pwmC);				
