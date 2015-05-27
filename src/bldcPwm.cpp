@@ -298,7 +298,7 @@ bool checkISRData(pwmEntry_T  *table);
 				}
 				else
 				{
-					
+					OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
 					//while (TCNT1 <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.
 					while ((TIFR & _BV(OCF1A)) == 0)  asm(" ");
 					
