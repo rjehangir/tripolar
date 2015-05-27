@@ -22,7 +22,7 @@
 
 void setup(void);
 void loop(void);
-void incrementRotor(void);
+void incrementRotor(uint8_t value);
 
 
 
@@ -76,6 +76,7 @@ void incrementRotor(void);
 #define PHASE_SHIFT  85
 
 bldcPwm motorPwm;
+uint16_t speed_rpm;
 
 int main(void)
 {
@@ -153,8 +154,17 @@ void setup(void)
 void loop(void)
 {
 	static int16_t loopCount = 0;
+	static int16_t cycleCount = 0;
+	bool newValue =false;
 	static bool done = false;
 	static bool enabled = true;
+	static uint8_t rotorIncrement = 0;
+	
+	//Convert from RPM to increment
+	
+	
+	
+	
 	
 	DEBUG_OUT(0x03);
 	loopCount++;
@@ -163,11 +173,26 @@ void loop(void)
 	//incrementRotor();
 	DEBUG_OUT(0x04);
 
+	
+	
+	
+	
+	if (cycleCount>=1000)
+	{
+		cycleCount = 0;
+		speed_rpm += 10;
+		uint32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
+		numerator *= speed_rpm;
+		uint32_t denomenator = 	PWM_INCREMENT_SCALER_DENOMENATOR;
+		numerator /= denomenator;
+		rotorIncrement = numerator;
+	}
+
 	if (!motorPwm.busy())
-	{						
-		incrementRotor();						
-		loopCount = 0;
-	} 
+	{
+		incrementRotor(rotorIncrement);	
+		cycleCount++;
+	}
 
 	
 	DEBUG_OUT(0x05);
@@ -180,14 +205,14 @@ void loop(void)
 
 
 
-void incrementRotor(void)
+void incrementRotor(uint8_t value)
 {
    static uint8_t currentStep = 0;	
    uint16_t pwmA,pwmB,pwmC;		
    uint8_t indexA,indexB,indexC;
 
    
-   currentStep++;
+   currentStep += value;
    
    indexA = currentStep;
    indexB = currentStep + PHASE_SHIFT;

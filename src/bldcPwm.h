@@ -69,6 +69,10 @@
 
 
 
+		
+		
+
+
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -77,24 +81,70 @@
 */	
 
 
-#define  FET_SWITCH_TIME_CNT ((uint16_t)(kFetSwitchTime_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
-	 /**< kFetSwitchTime_uS converted to timer counts */
-#define  MIN_TIMER_OCR_CNT   ((uint16_t)(kMinTimerDelta_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
-	 /**< kMinTimerDelta_uS converted to timer counts  */
+		#define  FET_SWITCH_TIME_CNT ((uint16_t)(kFetSwitchTime_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
+			 /**< kFetSwitchTime_uS converted to timer counts */
+		#define  MIN_TIMER_OCR_CNT   ((uint16_t)(kMinTimerDelta_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
+			 /**< kMinTimerDelta_uS converted to timer counts  */
 	 
 	 
-#define ISR_LOOP_CNT  ((uint16_t)(ISR_LOOP_US*(PWM_TIMER_FREQ_KHZ/1000)) )
+		#define ISR_LOOP_CNT  ((uint16_t)(ISR_LOOP_US*(PWM_TIMER_FREQ_KHZ/1000)) )
 
-#define  PWM_CYCLE_CNT	    ((uint16_t)((PWM_TIMER_FREQ_KHZ)/(PWM_FREQ_KHZ))	)
-     /**<Number of timer counts in one PWM cycle */
+		#define  PWM_CYCLE_CNT	    ((uint16_t)((PWM_TIMER_FREQ_KHZ)/(PWM_FREQ_KHZ))	)
+			 /**<Number of timer counts in one PWM cycle */
 
-#define MAX_LOWX_CNT		( (uint16_t)(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1))
-	/**<Maximum absolute time the ePwmCommand_LOWx commands are allowed. Longer than this they conflict
-	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
+		#define MAX_LOWX_CNT		( (uint16_t)(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1))
+			/**<Maximum absolute time the ePwmCommand_LOWx commands are allowed. Longer than this they conflict
+			 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/
 	
-#define MAX_OFFX_CNT		((uint16_t)(MAX_LOWX_CNT - FET_SWITCH_TIME_CNT))
-	/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
-	 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/	
+		#define MAX_OFFX_CNT		((uint16_t)(MAX_LOWX_CNT - FET_SWITCH_TIME_CNT))
+			/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
+			 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/	
+	
+	
+		/**********************************************************************************************************
+		 * PWM_INCREMENT_SCALER
+		 *
+		 * DESCRIPTION:
+		 *  The speed in RPM gets multiplied by this number to determine the number of positions to increment
+		 * each PWM cycle 
+		 * CALCULATION:
+		 *		
+		 *
+		 *		
+		 *		ROT  |  1 MIN       |  1 SEC					    |COIL_RATIO COILS | 255 COUNTS
+		 *		_____|______________|_______________________________|_________________|______________|
+		 *		     |              |                               |                 |              |
+		 *		MIN  |  60 SECONDS  |   1000*PWM_FREQ_KHZ PWM_CYCLES|1 ROT            | 1 COIL
+		 *		
+		 *		
+		 *		rotorIncrement =	speed_rpm *   255 * COIL_RATIO			  COUNTS 
+		 *							_______________________________			___________		
+		 *							    60*1000*PWM_FREQ_KHZ				 PWM_CYCLE
+		 *						= speed_rpm  * (255*7)/60000 = 1785/60000 = 357/12000 
+		 *
+		 *  MAXIMUM VALUE DURING CALCULATION: (assume max speed of 2000 RPM)
+		 *      2000*357 / 12000 =  714000 / 12000 (714,000 fits into a 32bit integer)
+		 *			If we dont precalculate the value with COIL_RATIO then:
+		 *	    2000*255*7 / 60*1000*1 = 3570000/60000 which also fits into a 32 but integer
+		 *		
+		 *  MINIMUM SPEED:
+		 *      1 = speed_RPM * 357 /12000; speed_rpm = 12000/357 = 33 RPM = .55 rotations per second.
+		 **********************************************************************************************************						
+				*/
+
+
+		#define PWM_INCREMENT_SCALER_NUMERATOR     (255*COIL_RATIO) 
+		#define PWM_INCREMENT_SCALER_DENOMENATOR  (60000 * PWM_FREQ_KHZ)
+				/**The speed in RPM gets multiplied by this number to determine the number of positions to increment 
+				 * each PWM cycle */
+	
+	
+	
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& CLASS DEFINITION
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/	
 	
 /********************************************************************************************************/
 /* CLASS: bldcPwm																						*/
@@ -104,11 +154,12 @@
 class bldcPwm
 {
 	
+	
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	&&& PUBLIC STRUCTURE DEFINITIONS
+	&&& PUBLIC STRUCTURES
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	*/	public:
+	*/ public:
 	
 			
 	
