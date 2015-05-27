@@ -576,6 +576,7 @@ bool checkISRData(pwmEntry_T  *table);
 		{
 			DEBUG_OUT(0x0D);
 			asm("NOP");
+				if  (!checkISRData(tableHead)) asm("NOP");  //For debug so we can step and see why it failed.
 		}
 		
 		DEBUG_OUT(0x0E);
@@ -602,18 +603,28 @@ bool checkISRData(pwmEntry_T  *table);
 		
 		for (uint8_t n=0;n<8;n++)
 		{
-			if (p->command ==  bldcPwm::ePwmCommand_LOWA && commandCalled[bldcPwm::ePwmCommand_OFFA] == false) return false;
-			if (p->command == bldcPwm::ePwmCommand_LOWB && commandCalled[bldcPwm::ePwmCommand_OFFB] == false) return false;
-			if (p->command == bldcPwm::ePwmCommand_LOWC && commandCalled[bldcPwm::ePwmCommand_OFFC] == false) return false;
+			if (p->command ==  bldcPwm::ePwmCommand_LOWA && commandCalled[bldcPwm::ePwmCommand_OFFA] == false) 
+					return false;
+			if (p->command == bldcPwm::ePwmCommand_LOWB && commandCalled[bldcPwm::ePwmCommand_OFFB] == false) 
+				return false;
+			if (p->command == bldcPwm::ePwmCommand_LOWC && commandCalled[bldcPwm::ePwmCommand_OFFC] == false) 
+				return false;
 			totalCounts += p->deltaTime;
-			if (totalCounts > PWM_CYCLE_CNT) return false;
+			
 			commandCalled[p->command ] = true;
 			p++;
 		}
 		
-		if (table[0].command != bldcPwm::ePwmCommand_START) return false;
-		if (table[7].command != bldcPwm::ePwmCommand_ALLOFF) return false;
-		return retVal;
+		
+		if (totalCounts > PWM_CYCLE_CNT) 
+				return false;
+		if (totalCounts < (PWM_CYCLE_CNT*2)/3)
+				return false;
+		if (table[0].command != bldcPwm::ePwmCommand_START)
+			 return false;
+		if (table[7].command != bldcPwm::ePwmCommand_ALLOFF) 
+			return false;
+		return true;
 	}
 	
 	
