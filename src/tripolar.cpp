@@ -163,14 +163,19 @@ void loop(void)
 	//incrementRotor();
 	DEBUG_OUT(0x04);
 
-	if (loopCount >=100)
-	{				
+	if (!motorPwm.busy())
+	{						
 		incrementRotor();						
 		loopCount = 0;
 	} 
 
 	
 	DEBUG_OUT(0x05);
+	
+	
+					
+	
+	
 }
 
 
@@ -183,6 +188,7 @@ void incrementRotor(void)
 
    
    currentStep++;
+   
    indexA = currentStep;
    indexB = currentStep + PHASE_SHIFT;
    indexC = indexB + PHASE_SHIFT;
