@@ -490,6 +490,7 @@
 					pSortEntry->pNextEntry->pNextEntry = pSortEntry;     //guy after me points to me
 					pSortEntry->pNextEntry = pTemp;						 //I point to what guy after me WAS pointing too					
 					touchedFlag = true;	 //We made a change, so this sort needs to run at least once more
+					linkPosition++;  
 				}
 				
 				pPreviousEntry = pSortEntry;				
