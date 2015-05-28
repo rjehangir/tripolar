@@ -367,7 +367,7 @@ bool checkISRData(pwmEntry_T  *table);
 		// Reset timer
 		TCCR1A = 0;
 		TCCR1B = 0;
-		TIMSK = 0;
+		TIMSK &= ~(_BV(TOIE1)|_BV(OCIE1B)|_BV(OCIE1A)|_BV(TICIE1));
 		TCNT1 = 0;
 		
 		

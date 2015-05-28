@@ -19,6 +19,7 @@
 #include "fets.h"
 #define F_CPU 16000000UL
 #include <util/delay.h>
+#include "millis.h"
 
 void setup(void);
 void loop(void);
@@ -137,6 +138,7 @@ _delay_ms(1);
 
 void setup(void)
 {
+	millis_init();
 	DEBUG_OUT(0x01);
 	motorPwm.begin();
 	DEBUG_OUT(0x02);
@@ -159,6 +161,9 @@ void loop(void)
 	static bool done = false;
 	static bool enabled = true;
 	static uint8_t rotorIncrement = 0;
+	static uint8_t accumulator = 0;
+	static uint16_t incrementDelay_ms = 1, incrementTime = 0;
+	static uint8_t incrementAmount = 1;
 	
 	//Convert from RPM to increment
 	
@@ -176,7 +181,7 @@ void loop(void)
 	
 	
 	
-	
+	/*
 	if (cycleCount>=1000)
 	{
 		cycleCount = 0;
@@ -187,11 +192,20 @@ void loop(void)
 		numerator /= denomenator;
 		rotorIncrement = numerator;
 	}
+	*/
+	
+	
+	if (_ms - incrementTime >= incrementDelay_ms )
+	{
+		incrementTime = _ms;
+		accumulator += incrementAmount;
+	}
+	
 
 	if (!motorPwm.busy())
 	{
-		incrementRotor(rotorIncrement);	
-		cycleCount++;
+		incrementRotor(accumulator);	
+		accumulator = 0;	
 	}
 
 	
