@@ -130,6 +130,14 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\src\bldcGimbal.cpp">
+      <SubType>compile</SubType>
+      <Link>bldcGimbal.cpp</Link>
+    </Compile>
+    <Compile Include="..\src\bldcGimbal.h">
+      <SubType>compile</SubType>
+      <Link>bldcGimbal.h</Link>
+    </Compile>
     <Compile Include="..\src\fets.h">
       <SubType>compile</SubType>
       <Link>fets.h</Link>

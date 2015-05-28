@@ -57,10 +57,7 @@
 			 * interrupt while we are busy setting it up. To prevent this, we set a rule which says that 
 			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
-			
-#define COIL_RATIO  6  
-			/**< The number of sine cycles each coil needs to go through for motor to 
-			 * make on rotation																				*/
+		
 						
 #define PWM_TIMER_FREQ_KHZ  (uint16_t)16000
 			/**< The frequency which timer1 (the 16 bit timer) is running at. If you change the prescaling
@@ -101,42 +98,7 @@
 			 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/	
 	
 	
-		/**********************************************************************************************************
-		 * PWM_INCREMENT_SCALER
-		 *
-		 * DESCRIPTION:
-		 *  The speed in RPM gets multiplied by this number to determine the number of positions to increment
-		 * each PWM cycle 
-		 * CALCULATION:
-		 *		
-		 *
-		 *		
-		 *		ROT  |  1 MIN       |  1 SEC					    |COIL_RATIO COILS | 255 COUNTS
-		 *		_____|______________|_______________________________|_________________|______________|
-		 *		     |              |                               |                 |              |
-		 *		MIN  |  60 SECONDS  |   1000*PWM_FREQ_KHZ PWM_CYCLES|1 ROT            | 1 COIL
-		 *		
-		 *		
-		 *		rotorIncrement =	speed_rpm *   255 * COIL_RATIO			  COUNTS 
-		 *							_______________________________			___________		
-		 *							    60*1000*PWM_FREQ_KHZ				 PWM_CYCLE
-		 *						= speed_rpm  * (255*7)/60000 = 1785/60000 = 357/12000 
-		 *
-		 *  MAXIMUM VALUE DURING CALCULATION: (assume max speed of 2000 RPM)
-		 *      2000*357 / 12000 =  714000 / 12000 (714,000 fits into a 32bit integer)
-		 *			If we dont precalculate the value with COIL_RATIO then:
-		 *	    2000*255*7 / 60*1000*1 = 3570000/60000 which also fits into a 32 but integer
-		 *		
-		 *  MINIMUM SPEED:
-		 *      1 = speed_RPM * 357 /12000; speed_rpm = 12000/357 = 33 RPM = .55 rotations per second.
-		 **********************************************************************************************************						
-				*/
-
-
-		#define PWM_INCREMENT_SCALER_NUMERATOR     (255*COIL_RATIO) 
-		#define PWM_INCREMENT_SCALER_DENOMENATOR  (60U * 1000U * PWM_FREQ_KHZ)
-				/**The speed in RPM gets multiplied by this number to determine the number of positions to increment 
-				 * each PWM cycle */
+		
 	
 	
 	
