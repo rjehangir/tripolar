@@ -58,7 +58,7 @@
 			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
 			
-#define COIL_RATIO  7  
+#define COIL_RATIO  6  
 			/**< The number of sine cycles each coil needs to go through for motor to 
 			 * make on rotation																				*/
 						
