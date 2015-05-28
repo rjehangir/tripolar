@@ -24,6 +24,7 @@
 void setup(void);
 void loop(void);
 void incrementRotor(uint8_t value);
+void set_rpm(uint16_t value);
 
 
 
@@ -79,6 +80,11 @@ void incrementRotor(uint8_t value);
 bldcPwm motorPwm;
 uint16_t speed_rpm;
 
+
+	
+uint8_t baseIncrement = 0;  /*This is the amount which needs to be incremented every PWM cycle */
+uint16_t incrementDelay_ms = 1000; /*The accumulator is incremented by one each time this amount of time passes*/
+
 int main(void)
 {
 	boardInit();
@@ -89,41 +95,9 @@ int main(void)
 	//_delay_ms(500);
 	for (uint8_t n=0;n<=0x0F;n++)
 	{
-
 			DEBUG_OUT(n);
 			//_delay_ms(10);
 	}
-//	_delay_ms(500);	
-	DEBUG_OUT(0x00);
-	//_delay_ms(25);
-	
-//	_delay_ms(1000);
-	
-/*
-do {
-
-ApFETOn();
-BpFETOn();
-CpFETOn();
-_delay_ms(500);
-ApFETOff();
-_delay_ms(1);
-AnFETOn();
-_delay_ms(500);
-BpFETOff();
-_delay_ms(1);
-BnFETOn();
-_delay_ms(500);
-CpFETOff();
-_delay_ms(1);
-CnFETOn();
-_delay_ms(500);
-lowSideOff();
-_delay_ms(1);	
-
-}while(1);
-
-	*/
 	setup();
 	
 	
@@ -135,76 +109,47 @@ _delay_ms(1);
 }
 
 
-
 void setup(void)
 {
 	millis_init();
-	DEBUG_OUT(0x01);
 	motorPwm.begin();
-	DEBUG_OUT(0x02);
-	//incrementRotor();
-	
-	/*motorPwm.set_pwm(bldcPwm::ePwmChannel_A,900);
-	motorPwm.set_pwm(bldcPwm::ePwmChannel_B,600);
-	motorPwm.set_pwm(bldcPwm::ePwmChannel_C,300);
-	motorPwm.update(); */
-
+	set_rpm(500);	
 }
-
-
 
 void loop(void)
 {
 	static int16_t loopCount = 0;
-	static int16_t cycleCount = 0;
-	bool newValue =false;
-	static bool done = false;
-	static bool enabled = true;
-	static uint8_t rotorIncrement = 0;
-	static uint8_t accumulator = 0;
-	static uint16_t incrementDelay_ms = 1, incrementTime = 0;
-	static uint8_t incrementAmount = 1;
+	//static int16_t cycleCount = 0;
+	//bool newValue =false;
+	//static bool done = false;
+	//static bool enabled = true;
+	//static uint8_t rotorIncrement = 0;
 	
-	//Convert from RPM to increment
+	
+	//static uint8_t incrementAmount = 1;
 	
 	
 	
+	static uint8_t accumulator = 0; /*This is an additional amount which is incremented via a timer and added to the base increment*/
+	static uint32_t accelerateTimer; 
+	static uint32_t incrementTimer = 0;
 	
-	
-	DEBUG_OUT(0x03);
 	loopCount++;
 	
 	motorPwm.tickle();
-	//incrementRotor();
-	DEBUG_OUT(0x04);
-
 	
 	
-	
-	/*
-	if (cycleCount>=1000)
+	if (_ms - incrementTimer >= incrementDelay_ms )
 	{
-		cycleCount = 0;
-		speed_rpm += 10;
-		uint32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
-		numerator *= speed_rpm;
-		uint32_t denomenator = 	PWM_INCREMENT_SCALER_DENOMENATOR;
-		numerator /= denomenator;
-		rotorIncrement = numerator;
+		incrementTimer = _ms;
+		accumulator++;
 	}
-	*/
 	
-	
-	if (_ms - incrementTime >= incrementDelay_ms )
-	{
-		incrementTime = _ms;
-		accumulator += incrementAmount;
-	}
 	
 
 	if (!motorPwm.busy())
 	{
-		incrementRotor(accumulator);	
+		incrementRotor(baseIncrement + accumulator);	
 		accumulator = 0;	
 	}
 
@@ -217,6 +162,18 @@ void loop(void)
 	
 }
 
+
+void set_rpm(uint16_t value)
+{
+	uint32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
+	numerator *= value;
+	numerator *= 1000;
+	uint32_t denomenator = 	PWM_INCREMENT_SCALER_DENOMENATOR;
+	uint32_t calcValue = numerator / denomenator;
+	baseIncrement = calcValue / 1000;
+	uint32_t remainder = calcValue - ((uint32_t)baseIncrement *1000);
+	incrementDelay_ms = 1000 / remainder;	
+}
 
 
 void incrementRotor(uint8_t value)
