@@ -83,7 +83,7 @@ uint16_t speed_rpm;
 
 	
 uint8_t baseIncrement = 0;  /*This is the amount which needs to be incremented every PWM cycle */
-uint16_t incrementDelay_ms = 1000; /*The accumulator is incremented by one each time this amount of time passes*/
+uint16_t incrementDelay_100us = 1000; /*The accumulator is incremented by one each time this amount of time passes*/
 
 int main(void)
 {
@@ -139,9 +139,9 @@ void loop(void)
 	motorPwm.tickle();
 	
 	
-	if (_ms - incrementTimer >= incrementDelay_ms )
+	if (_100us - incrementTimer >= incrementDelay_100us )
 	{
-		incrementTimer = _ms;
+		incrementTimer = _100us;
 		accumulator++;
 	}
 	
@@ -172,7 +172,7 @@ void set_rpm(uint16_t value)
 	uint32_t calcValue = numerator / denomenator;
 	baseIncrement = calcValue / 1000;
 	uint32_t remainder = calcValue - ((uint32_t)baseIncrement *1000);
-	incrementDelay_ms = 1000 / remainder;	
+	incrementDelay_100us = 10000 / remainder;	
 }
 
 
