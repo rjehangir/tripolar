@@ -134,7 +134,7 @@
 
 
 		#define PWM_INCREMENT_SCALER_NUMERATOR     (255*COIL_RATIO) 
-		#define PWM_INCREMENT_SCALER_DENOMENATOR  (60000 * PWM_FREQ_KHZ)
+		#define PWM_INCREMENT_SCALER_DENOMENATOR  (60 * 1000 * PWM_FREQ_KHZ)
 				/**The speed in RPM gets multiplied by this number to determine the number of positions to increment 
 				 * each PWM cycle */
 	
