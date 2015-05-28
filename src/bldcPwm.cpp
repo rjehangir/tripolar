@@ -198,9 +198,7 @@ bool checkISRData(pwmEntry_T  *table);
 		OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
  		DEBUG_OUT(0x08);
 		redOn();
-		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.
-		bool orderError = false;
-		bool doExit = false;
+		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.		
 		if (!pwmIsrData.enabled) return;
 		for (int i=0;i<10;i++) {	//Repeat up to 11 times if deltaTime keeps being too short		
 			DEBUG_OUT(0x09);
@@ -593,8 +591,7 @@ bool checkISRData(pwmEntry_T  *table);
 	* @return true if data is valid. False if problem 
 	****************************************************************************/	
 	bool checkISRData(pwmEntry_T  *table)	
-	{	
-		bool retVal = false;
+	{			
 		bool commandCalled[8];
 		pwmEntry_T *p = table;
 		uint32_t totalCounts = 0;
