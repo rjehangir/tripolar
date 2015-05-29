@@ -73,11 +73,21 @@ void setup(void)
 	greenOn();
 	millis_init();
 	gimbal.begin();
-	gimbal.set_speed_rpm(500);	
 }
 
 void loop(void)
 {
+	static uint32_t lastTime = 0;
+	static uint16_t currentSpeed = 0;
+			
+	if (_100us-lastTime >=20000)
+	{
+		lastTime = _100us;
+		if (currentSpeed <10) currentSpeed++;
+		else currentSpeed += currentSpeed / 10;
+		gimbal.set_speed_rpm(currentSpeed);					
+	}
+		
 	gimbal.tickle();	
 }
 
