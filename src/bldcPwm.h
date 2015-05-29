@@ -57,8 +57,8 @@
 			 * interrupt while we are busy setting it up. To prevent this, we set a rule which says that 
 			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
-		
-						
+			
+			
 #define PWM_TIMER_FREQ_KHZ  (uint16_t)16000
 			/**< The frequency which timer1 (the 16 bit timer) is running at. If you change the prescaling
 			 * or the clock frequency such that the timer frequency changes, you will need to change this 
@@ -77,6 +77,13 @@
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */	
 
+
+		
+		#if (PWM_FREQ_KHZ <= 2)
+			#define FAST_PWM_DURATION_CALC
+			/* Tells pwmDuration_cnt() method to perform math calc in preprocessor. This is much faster
+			   but only value if PWM_CYCLE_CNT can be cleanly divided by kDutyCycleFullScale.			*/
+		#endif
 
 		#define  FET_SWITCH_TIME_CNT ((uint16_t)(kFetSwitchTime_uS*(PWM_TIMER_FREQ_KHZ/1000)) )
 			 /**< kFetSwitchTime_uS converted to timer counts */
@@ -332,7 +339,33 @@ class bldcPwm
 		 *      during the PWM cycle.																*/
 		/*------------------------------------------------------------------------------------------*/
 		{
-			return ((int32_t)PWM_CYCLE_CNT * (int32_t)value  ) / kDutyCycleFullScale;			
+						
+			/* In the case of PWM_CYCLE_COUNT  = 16000 and kDutyCycleFullScale = 1023
+			 * 16000/1023 = 15 which divides exactly so we can pre-divide it and also 
+			 * 1023 (the max value for "value") *15 = 16,000 which is safely a 16bit integer.
+			 *  Previously this function returned:
+			 *
+			 *  
+			 *
+			 *  which is safer if we keep changing PWM_CYCLE_CNT and kDutyCycleFullScale
+			 *  but is also a lot slower.
+			 *    Here are the "Safe" pwm frequencies which will work with this function:
+			 *
+			 *       PWM Speed      PWM_CYCLE_COUNT     Division Result    Safe ?
+			 *	     1Khz			16000				15					Yes
+			 *		 2Khz			8000				7					Yes
+			 *		 3Khz			5333.333			5.213				No
+			 *		 4Khz			4000				3.91				No
+			 *		 Others Not Safe Too			
+			 */
+				
+			#ifdef FAST_PWM_DURATION_CALC			
+				return	value*(PWM_CYCLE_CNT/kDutyCycleFullScale) ; 
+			#else
+			    return ((int32_t)PWM_CYCLE_CNT * (int32_t)value  ) / kDutyCycleFullScale;	 
+			#endif	
+				
+			
 		}
 		
 		

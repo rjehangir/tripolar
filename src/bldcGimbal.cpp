@@ -170,7 +170,7 @@
 	****************************************************************************/			
 	void bldcGimbal::incrementRotor(uint8_t value)
 	{
-		
+				
 		uint16_t pwmA,pwmB,pwmC;
 		uint8_t indexA,indexB,indexC;
 	
