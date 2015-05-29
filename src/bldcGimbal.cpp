@@ -118,11 +118,17 @@
 	void bldcGimbal::tickle(void)
 	{												
 			_motorPwm.tickle();
-						
-			if (_100us - _incrementTimer >= _incrementDelay_100us ){
-				_incrementTimer = _100us;
-				_accumulator++;
+			
+			
+			if (_incrementDelay_100us == 0) _accumulator = 0;
+			else
+			{
+				if (_100us - _incrementTimer >= _incrementDelay_100us){
+					_incrementTimer = _100us;
+					_accumulator++;
+				}				
 			}
+			
 						
 			if (!_motorPwm.busy()){
 				incrementRotor(_baseIncrement + _accumulator);
@@ -138,6 +144,12 @@
 	****************************************************************************/				 
 	void bldcGimbal::set_speed_rpm(uint16_t value)
 	{
+		if(value ==0)
+		{
+			_incrementDelay_100us = 0;
+			_baseIncrement = 0;
+			return;
+		}
 		_speed_rpm = value;
 		uint32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
 		numerator *= value;
