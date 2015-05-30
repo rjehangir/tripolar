@@ -68,17 +68,14 @@
 		 	 * of this structure is enough to completely describe a pwm cycle.								*/
 			/************************************************************************************************/
 			typedef volatile struct pwmEntry_S
-			{
-				volatile bldcPwm::pwmCommand_T command;  
-					/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T	*/
+			{				
+				volatile bldcPwm::COMMAND_T command;  
+						/**< What behavior to execute when the timer expires. See definition of pwmCommmand_T
+						 * and pwmSequence_T. This uses a macro which is either pwmCommand_T or pwmSequence_T
+						 * depending on PWM_SEQUENCE														*/
 				volatile uint16_t	deltaTime; 
 					/**< What value the timer should be at when this command is executed. This is referenced
-						* as a delta from the time that the previous command was executed.					*/	
-				//bool waitInISR; 
-					/**<set to true if deltaTime is so small that we risk missing the next ISR.					
-						* If set to true, the ISR will not exit on the previous entry, and instead,
-						* wait within the ISR for the next time to occur.									*/
-					
+						* as a delta from the time that the previous command was executed.					*/					
 				pwmExitMode_T exitMode; //Controls completion behavior at end of ISR. See pwmExitMode_T.
 			}pwmEntry_T;
 		
@@ -142,16 +139,28 @@
 		 * See the declaration of pwmIsrData_T for more information	 */
 	  pwmEntry_T IsrCurrentEntry;
 	  
-	  const pwmEntry_T pwmInit[8] =  {		  
-									  {(bldcPwm::pwmCommand_T) 0,	1600,	isrExitMode_Exit},
-									  {(bldcPwm::pwmCommand_T)5,	1600,	isrExitMode_Exit},
-									  {(bldcPwm::pwmCommand_T)6,	1600,	isrExitMode_Exit},
-									  {(bldcPwm::pwmCommand_T)3,	1600,	isrExitMode_Exit},
-									  {(bldcPwm::pwmCommand_T)4,	1600,	isrExitMode_Exit},
-									  {(bldcPwm::pwmCommand_T)1,	1600,	isrExitMode_Exit},
-									  {(bldcPwm::pwmCommand_T)2,	1600,	isrExitMode_Exit},
-									  {(bldcPwm::pwmCommand_T)7,	1600,	isrExitMode_Exit}
-								  };
+	  
+#ifndef PWM_SEQUENTIAL	  
+	  const pwmEntry_T pwmInit[8] = 
+	  {		  
+		{(bldcPwm::pwmCommand_T) 0,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmCommand_T)5,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmCommand_T)6,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmCommand_T)3,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmCommand_T)4,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmCommand_T)1,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmCommand_T)2,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmCommand_T)7,	1600,	isrExitMode_Exit}
+	};
+#else
+	const pwmEntry_T pwmInit[8] =  
+	{
+		{(bldcPwm::pwmSequence_T)0,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmSequence_T)1,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmSequence_T)2,	1600,	isrExitMode_Exit},
+		{(bldcPwm::pwmSequence_T)3,	1600,	isrExitMode_Exit},
+	};
+#endif 								  
 
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -193,6 +202,9 @@ bool checkISRData(pwmEntry_T  *table);
 	 *      Reference pwmIsrData_T and pwmEntry_T for more details on how this ISR works.
 	 *								*/
 	/****************************************************************************************************/			
+	
+#ifndef PWM_SEQUENTIAL
+
 	ISR(TIMER1_COMPA_vect) 
 	{
 		OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
@@ -200,56 +212,42 @@ bool checkISRData(pwmEntry_T  *table);
 		redOn();
 		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.		
 		if (!pwmIsrData.enabled) return;
+		
 		for (int i=0;i<10;i++) {	//Repeat up to 11 times if deltaTime keeps being too short		
 			DEBUG_OUT(0x09);
-			
-			//DEBUG_OUT(pwmIsrData.pEntry->command);
-		
-		
 			DEBUG_OUT(pwmIsrData.pEntry->command);
 			switch (pwmIsrData.pEntry->command)
 			{
-				case bldcPwm::ePwmCommand_START:
-				
-						ApFETOn();
-						BpFETOn();
-						CpFETOn();
-						incEntry = true;						
-						break;									
-					
+				case bldcPwm::ePwmCommand_START:				
+					ApFETOn();
+					BpFETOn();
+					CpFETOn();
+					incEntry = true;						
+					break;														
 				case bldcPwm::ePwmCommand_OFFA:
 					ApFETOff();
 					incEntry = true;
 					break;
-				case bldcPwm::ePwmCommand_LOWA:
-				//	_delay_ms(10);
-					
-						AnFETOn();					
-						incEntry = true;
-					
+				case bldcPwm::ePwmCommand_LOWA:				
+					AnFETOn();					
+					incEntry = true;					
 					break;
 				case bldcPwm::ePwmCommand_OFFB:
 					BpFETOff();
 					incEntry = true;
 					break;
 				case bldcPwm::ePwmCommand_LOWB:
-				//	_delay_ms(10);
-					
-						BnFETOn();
-						incEntry = true;
-						break;
-					
+					BnFETOn();
+					incEntry = true;
+					break;					
 				case bldcPwm::ePwmCommand_OFFC:
 					CpFETOff();
 					incEntry = true;
 					break;
-				case bldcPwm::ePwmCommand_LOWC:
-				
-						CnFETOn();
-						incEntry = true;
-						break;
-				
-				
+				case bldcPwm::ePwmCommand_LOWC:				
+					CnFETOn();
+					incEntry = true;
+					break;								
 				case bldcPwm::ePwmCommand_ALLOFF:
 					AnFETOff();
 					BnFETOff();
@@ -277,43 +275,110 @@ bool checkISRData(pwmEntry_T  *table);
 					pwmIsrData.enabled	 = false;
 					break;					
 			}
-			
-			
-			
-			
-						
-			//Go to next entry if the switch told us to.
-			if (incEntry) pwmIsrData.pEntry++;
-			
+			if (incEntry) pwmIsrData.pEntry++; //Go to next entry if the switch told us to.			
 			if (pwmIsrData.pEntry->exitMode != isrExitMode_Loop)
 			{
 				OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-				if (pwmIsrData.pEntry->exitMode  == isrExitMode_Exit)
-				{
-					
-					//TCNT1 = 0;
-					//TIFR = _BV(OCF1A); // Clear any pending interrupts
-					break;
-				}
+				if (pwmIsrData.pEntry->exitMode  == isrExitMode_Exit) break;				
 				else
-				{
-					
+				{					
 					//while (TCNT1 <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.
 					while ((TIFR & _BV(OCF1A)) == 0)  asm(" ");
 					OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
-					TIFR = _BV(OCF1A); // Clear any pending interrupts
-					
+					TIFR = _BV(OCF1A); // Clear any pending interrupts					
 				}
-			}
-			TCNT1 = 0;
-	
-		}
-		
-		//   <========== !!!!!!! CLEAR THE INTERRUPT SOURCE !!!!!!!!
-		
+			} //END if (!isrExitMode_Loop)
+			TCNT1 = 0;	
+		} //END repeat (for loop)		
 	redOff();	
 	DEBUG_OUT(0x0B);
-	}
+	} //END Function
+	
+	
+#else
+
+	ISR(TIMER1_COMPA_vect) 
+		{
+			OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
+ 			DEBUG_OUT(0x08);
+			redOn();
+			bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.		
+			if (!pwmIsrData.enabled) return;
+			for (int i=0;i<10;i++) {	//Repeat up to 11 times if deltaTime keeps being too short		
+				DEBUG_OUT(0x09);			
+				DEBUG_OUT(pwmIsrData.pEntry->command);
+				switch (pwmIsrData.pEntry->command)
+				{
+					case bldcPwm::ePwmSequence_ENGAGEA:
+						CpFETOff();				
+						AnFETOff();
+						_delay_us(kFetSwitchTime_uS);
+						CnFETOn();
+						ApFETOn();
+						incEntry = true;						
+						break;														
+					case bldcPwm::ePwmSequence_ENGAGEB:
+						ApFETOff();
+						BnFETOff();
+						_delay_us(kFetSwitchTime_uS);
+						AnFETOn();
+						BpFETOn();
+						incEntry = true;
+						break;
+					case bldcPwm::ePwmSequence_ENGAGEC:
+						BpFETOff();
+						CnFETOff();
+						_delay_us(kFetSwitchTime_uS);
+						BnFETOn();
+						CpFETOn();
+						incEntry = true;
+						break;					
+					case bldcPwm::ePwmSequence_ALLOFF:
+						if (pwmIsrData.pEntry->deltaTime != 0) {
+							//highSideOff();
+							//lowSideOff();															
+						}
+			
+						if (pwmIsrData.changeTable == true)  //If user has requested a change of tables then ...
+						{
+							DEBUG_OUT(0x0A);						
+							pwmIsrData.pTableStart = (pwmIsrData.isActiveTableA ? pwmIsrData.tableA : pwmIsrData.tableB);										
+								/* Go to the beginning of the next table */
+							pwmIsrData.changeTable = false;															
+								/* In theory, the user sets changeTable to force a change in the table, in reality
+								 * isActiveTableA is enough. However, the user will look at changeTable to see if 
+								 * the change over was made, so that he knows when he can start writing to the 
+								 * free table again. so we reset the flag here.									*/
+						}					
+						pwmIsrData.pEntry = pwmIsrData.pTableStart; //Reset script entry to beginning.
+						incEntry = false; //Don't increment entry because we just sent entry to beginning instead.
+						break;				
+					default:
+						DEBUG_OUT(0xFF);
+						//Something is very wrong, stop processing the ISR
+						pwmIsrData.enabled	 = false;
+						break;					
+				}
+																					
+				if (incEntry) pwmIsrData.pEntry++; //Go to next entry if the switch told us to.			
+				if (pwmIsrData.pEntry->exitMode != isrExitMode_Loop)
+				{
+					OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
+					if (pwmIsrData.pEntry->exitMode  == isrExitMode_Exit) break;				
+					else
+					{										
+						while ((TIFR & _BV(OCF1A)) == 0)  asm(" ");
+						OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
+						TIFR = _BV(OCF1A); // Clear any pending interrupts					
+					}
+				} //END IF  (!isrExitMode_Loop)
+				TCNT1 = 0;
+			} //END repeat (for loop)		
+		redOff();	
+		DEBUG_OUT(0x0B);
+		} //END FUNCTION
+
+#endif 	
 
 
 /*
@@ -383,13 +448,17 @@ bool checkISRData(pwmEntry_T  *table);
 
 
 
-	 	 
+	 
+	
+#ifndef	PWM_SEQUENTIAL	
+
+	 
 	/****************************************************************************
 	*  Class: bldcPwm
-	*  Method: updateISR
-	*	Description:
+	*  Method: updateISR - NORMAL IMPLEMENTATION
+	*	Description:	
 	*		See class header file for a full API description of this method
-	****************************************************************************/		
+	****************************************************************************/	
 	void  bldcPwm::updateISR(void)
 	{
 		
@@ -406,10 +475,10 @@ bool checkISRData(pwmEntry_T  *table);
 
 		static pwmSortList_T sortList[8];
 			/**< A temporary list which information on each ISR command and its absolute
-			 * time. Includes addition fields which support list sorting. A list of commands
-			 * is made here first, sorted, and then finally exported to the ISR data structure. 
-			 * it is made 'static' to prevent it from being put on the stack, which is too small
-			 * to hold it.*/
+				* time. Includes addition fields which support list sorting. A list of commands
+				* is made here first, sorted, and then finally exported to the ISR data structure. 
+				* it is made 'static' to prevent it from being put on the stack, which is too small
+				* to hold it.*/
 		pwmSortList_T *pSortEntry;
 		pwmSortList_T *pPreviousEntry;
 		
@@ -418,12 +487,12 @@ bool checkISRData(pwmEntry_T  *table);
 		
 		volatile pwmEntry_T *pIsrScriptEntry;   
 			/**< Pointer to the an entry in pwm script table which we are creating.
-			 * We use this point to navigate the table as we populate it. */		
+				* We use this point to navigate the table as we populate it. */		
 
 		uint16_t totalTime = 0; 
 			/**<Running count of what time elapsed is since the start of the PWM cycle, as
-             * of the last pIsrScriptEntry.  We do this to help convert absolute time into
-             * deltaTime while populating the ISR data structure. Using are in counts. */
+				* of the last pIsrScriptEntry.  We do this to help convert absolute time into
+				* deltaTime while populating the ISR data structure. Using are in counts. */
 		
 						
 		DEBUG_OUT(0x01);
@@ -440,7 +509,7 @@ bool checkISRData(pwmEntry_T  *table);
 		DEBUG_OUT(0x02);
 		
 		//---------------------------------------------------------------------------------
-		// COVVERT FROM DUTY CYCLE TO TIMER EXPIRATION
+		// CONVERT FROM DUTY CYCLE TO TIMER EXPIRATION
 		//---------------------------------------------------------------------------------				
 		#define MAX_PWM_CHANNEL PWM_CYCLE_CNT - (2*FET_SWITCH_TIME_CNT)
 		for (uint16_t channel = 0; channel <3;channel++)
@@ -476,10 +545,10 @@ bool checkISRData(pwmEntry_T  *table);
 		// SORT THE LIST
 		//---------------------------------------------------------------------------------
 		/*Note that the first and last items in the list are fixed and don't need to 
-		 * be sorted. ePwmCommand_START is always first, and ePwmCommand_ALLOFF is 
-		 * always last. The consequence of this is: 1) We never have to change 
-		 * the PHeadEntry pointer (I trust that the compiler will optimize this out)
-		 * and 2) That we never have to check for insertion after the last entry. */
+			* be sorted. ePwmCommand_START is always first, and ePwmCommand_ALLOFF is 
+			* always last. The consequence of this is: 1) We never have to change 
+			* the PHeadEntry pointer (I trust that the compiler will optimize this out)
+			* and 2) That we never have to check for insertion after the last entry. */
 
 		bool touchedFlag; ///<true if the list order was changed at all	
 		do {
@@ -489,7 +558,7 @@ bool checkISRData(pwmEntry_T  *table);
 				/* Skipping first entry, The head is always the first element. See note above. */
 			pPreviousEntry = sortList; //Since current entry is seconds element, previous is first
 				
-		    touchedFlag = false; //true if the list order was changed at all
+			touchedFlag = false; //true if the list order was changed at all
 			do {
 				DEBUG_OUT(0x06);				
 				if (pSortEntry->absoluteCount > pSortEntry->pNextEntry->absoluteCount) {	
@@ -503,15 +572,15 @@ bool checkISRData(pwmEntry_T  *table);
 				}
 				
 				pPreviousEntry = pSortEntry;				
-			    pSortEntry = pSortEntry->pNextEntry;  //increment to next entry				
+				pSortEntry = pSortEntry->pNextEntry;  //increment to next entry				
 				linkPosition++;
 
 				
 			}while (linkPosition < 6 );
 				/* Remember that the last position has a pNextEntry of 0.
-				 * If the we are at the second to last list position, no need to 
-				 * compare it with the last because by definition, nothing comes 
-				 * after the ePwmCommand_ALLOFF which was already placed there. */
+					* If the we are at the second to last list position, no need to 
+					* compare it with the last because by definition, nothing comes 
+					* after the ePwmCommand_ALLOFF which was already placed there. */
 
 		} while (touchedFlag);
 			
@@ -548,9 +617,7 @@ bool checkISRData(pwmEntry_T  *table);
 			else if (pIsrScriptEntry->deltaTime <= MIN_TIMER_OCR_CNT ) pIsrScriptEntry->exitMode = isrExitMode_Wait;
 			else pIsrScriptEntry->exitMode = isrExitMode_Exit;
 
-			
-			
-									
+					
 			totalTime += pIsrScriptEntry->deltaTime;
 			pIsrScriptEntry++;	
 			pSortEntry = pSortEntry->pNextEntry;					
@@ -578,10 +645,103 @@ bool checkISRData(pwmEntry_T  *table);
 		}
 		
 		DEBUG_OUT(0x0E);
-	}
+	}		
+	
+
+#else
+ 
+	/****************************************************************************
+	*  Class: bldcPwm
+	*  Method: updateISR - SEQUENTIAL IMPLEMENTATION
+	*	Description:	
+	*		See class header file for a full API description of this method
+	*****************************************************************************/	
+void  bldcPwm::updateISR(void)
+	{		
+		
+		if (pwmIsrData.changeTable) return;
+		
+		uint8_t n; //Generic Loop Variable 
+		DEBUG_OUT(0x0E);				
+		volatile pwmEntry_T *pIsrScriptEntry;   
+			/**< Pointer to the an entry in pwm script table which we are creating.
+				* We use this point to navigate the table as we populate it. */		
+
+		uint16_t totalTime = 0; 
+			/**<Running count of what time elapsed is since the start of the PWM cycle, as
+				* of the last pIsrScriptEntry.  We do this to help convert absolute time into
+				* deltaTime while populating the ISR data structure. Using are in counts. */					
+		
+		//---------------------------------------------------------------------------------
+		// CONVERT FROM DUTY CYCLE TO TIMER EXPIRATION
+		//---------------------------------------------------------------------------------				
+		#define MAX_PWM_CHANNEL PWM_CYCLE_CNT - (2*FET_SWITCH_TIME_CNT)
+		for (uint16_t channel = 0; channel <3;channel++)
+		{
+			uint16_t timerCount = pwmDuration_cnt(_pwmChannel[channel].dutyCycle);					
+			timerCount = (timerCount >=MAX_PWM_CHANNEL? MAX_PWM_CHANNEL-1:timerCount);					
+			_pwmChannel[channel].timerCount = timerCount;
+		}
+		
+		DEBUG_OUT(0x03);
+		
+		//---------------------------------------------------------------------------------
+		// LOAD THE ISR DATA STRUCTURE
+		//---------------------------------------------------------------------------------
+		pIsrScriptEntry  = (pwmIsrData.isActiveTableA ? pwmIsrData.tableB : pwmIsrData.tableA);		
+		
+		//Calculate the total number of PWM counts across all channels
+		for(n =0;n<ePwmChannel_COUNT;n++) totalTime += _pwmChannel[n].timerCount;
+		
+		//ePwmSequence_ENGAGEA
+		pIsrScriptEntry->deltaTime = PWM_CYCLE_CNT - totalTime;
+							
+		//SET EVERYTHING ELSE FOR ALL CHANNELS		
+		for (n=0; n < ePwmSequence_END_OF_ENUM;n++)
+		{
+			/*
+			 ---------------------------------------------------------------------------------
+			  SET THE DELTA TIME 
+			  This is how long to wait BEFORE executing the 
+			  command, so the delay is really the pulse width of the previous 
+			  cycle. 					
+						 ePwmSequence_ENGAGEA    PWM_CYCLE_CNT-totalTime(Already Set, Don't Touch it)
+						 ePwmSequence_ENGAGEB	_pwmChannel[ePwmSequence_ENGAGEA].timerCount;
+						 ePwmSequence_ENGAGEC   _pwmChannel[ePwmSequence_ENGAGEB].timerCount;
+						 ePwmSequence_ALLOFF    _pwmChannel[ePwmSequence_ENGAGEC].timerCount;
+			  --------------------------------------------------------------------------------- */											
+			if (n != 0) pIsrScriptEntry->deltaTime = _pwmChannel[n-1].timerCount;
+				
+			
+			//Set the command (its just the same as the index)
+			pIsrScriptEntry->command = (pwmSequence_T)n;
+			
+			//Set the exit mode
+			if (pIsrScriptEntry->deltaTime <= ISR_LOOP_CNT ) pIsrScriptEntry->exitMode = isrExitMode_Loop;
+			else if (pIsrScriptEntry->deltaTime <= MIN_TIMER_OCR_CNT ) pIsrScriptEntry->exitMode = isrExitMode_Wait;
+			else pIsrScriptEntry->exitMode = isrExitMode_Exit;						
+			pIsrScriptEntry++;
+		}
+						
+		//---------------------------------------------------------------------------------
+		// TELL THE ISR TO SWITCH TO THE TABLE WE JUST CREATED
+		//---------------------------------------------------------------------------------
+		uint8_t sreg = SREG; //Save interrupt state
+		cli(); //Turn off interrupts while we write to active part of ISR's data
+		{
+			pwmIsrData.changeTable = true;
+			pwmIsrData.isActiveTableA = !pwmIsrData.isActiveTableA;
+		}
+		SREG = sreg; //Restore Interrupt State		
+		_updateOutstanding = false;			
+		DEBUG_OUT(0x0E);
+	}		
+	
+	#endif
 	
 	
-	
+#ifndef PWM_SEQUENTIAL
+
 	/*****************************************************************************
 	*  Function: checkISRData
 	*	Description:															 */
@@ -624,7 +784,7 @@ bool checkISRData(pwmEntry_T  *table);
 		return true;
 	}
 	
-	
+#endif		
 	
          
 	/****************************************************************************

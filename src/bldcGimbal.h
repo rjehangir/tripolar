@@ -61,6 +61,16 @@
 		#define PWM_INCREMENT_SCALER_DENOMENATOR  (60U * 1000U * PWM_FREQ_KHZ)
 				/**The speed in RPM gets multiplied by this number to determine the number of positions to increment 
 				 * each PWM cycle */
+				
+									
+
+		#ifdef PWM_SEQUENTIAL
+			#define SINE_TOTAL 384
+			/* When the each phase is shifted 120 degrees, the sum of the sine wave will total 
+			   a constant amount. This consistent sum is defined here for use in calculations in 
+			   this class.			*/
+		#endif
+		
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& CLASS DEFINITION
@@ -160,7 +170,23 @@ class bldcGimbal
 		*		The number of positions to increment the motor by.									 */
 		/*------------------------------------------------------------------------------------------*/
 					
-					
+		inline uint16_t sineToDutyCycle(uint8_t value)
+		{
+			#ifndef PWM_SEQUENTIAL
+				return 4*value;
+			#else
+				#define GENERIC_SCALER 64U
+				
+				return ( value*(uint16_t)((kDutyCycleFullScale * GENERIC_SCALER) / SINE_TOTAL))/(GENERIC_SCALER);
+					/* THE EQUATION IS  
+								value*(255/SINE_TOTAL)*(1023/255).
+								= value * (1023/SINE_TOTAL)
+					 But this requires either 
+				   floating point, or 32 but integer math.  The equation below plays some
+				   tricks to have the precompiler do most of the work, and also to 
+				   limit the work to 1 16bit multiple and 1 16 bit divide.  */				
+			#endif
+		}
 					
 					
 					

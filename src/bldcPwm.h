@@ -21,7 +21,15 @@
 */	
 
 
-	#define kDutyCycleFullScale  1023
+
+	#define PWM_SEQUENTIAL
+			/**< When NOT defined, the PWM triggers each pulse in parallel, so that the rising edge 
+			 *   for all three channel occurs at the same time. When DEFINED, each pulse will be 
+			 *   triggered sequentially, so that the rising edge of the next channel, occurs
+			 *   at the falling edge of the previous channel.  This approach assumes that the 
+			 *   sum of the dutyCycles of all three channels always total to the same amount.		
+			 *   COMMENT OUT THIS DEFINE IF YOU DONT WANT SEQUENTIAL PWM									*/
+	#define kDutyCycleFullScale  1000U
 			/**< Upper scale for duty cycle specification. For the set PWM method, this number is the 100% 
 			 * duty cycle equivelent. The set_pwm method will accept duty cycles between 0 and this number,
 			 * where kDutyCycleFullScale is 100% duty cycle.												*/
@@ -36,7 +44,7 @@
 			 * between the time that we turn one fet on an h bridge off and the time that we turn the other
 			 * FET (on the same HBridge) on.																*/
 			
-#define  kMinTimerDelta_uS  20
+	#define  kMinTimerDelta_uS  20
 			/**< Minimum Time Delta required for PWM ISR Exit in micro seconds. 
 			 * When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
 			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
@@ -45,11 +53,11 @@
 			 * if we are within MIN_TIMER_OCR_US from the next timer expire, we will remain in the ISR
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
 			
-#define ISR_LOOP_US 12
+	#define ISR_LOOP_US 12
 			/**< When deltaTime is below this value, the ISR will loop too handle the next edge without 
 			 * exiting the ISR, and without waiting for the timer to expire.								*/
 			
-#define PWM_FREQ_KHZ 1
+	#define PWM_FREQ_KHZ 1
 			/**< Pwm Frequency in Tenths of A KiloHertz.
 			 *  When we are running the PWM ISR, we will be processing timer interrupts. We will also be 
 			 * setting the next timer expiration from within the ISR. If the next timer interrupt is 
@@ -59,7 +67,7 @@
 			 * to wait for the next event, rather than risk leaving the ISR.								*/
 			
 			
-#define PWM_TIMER_FREQ_KHZ  (uint16_t)16000
+	#define PWM_TIMER_FREQ_KHZ  16000U
 			/**< The frequency which timer1 (the 16 bit timer) is running at. If you change the prescaling
 			 * or the clock frequency such that the timer frequency changes, you will need to change this 
 			 * number.																						*/		
@@ -80,7 +88,7 @@
 
 		
 		#if (PWM_FREQ_KHZ <= 2)
-			#define FAST_PWM_DURATION_CALC
+			//#define FAST_PWM_DURATION_CALC
 			/* Tells pwmDuration_cnt() method to perform math calc in preprocessor. This is much faster
 			   but only value if PWM_CYCLE_CNT can be cleanly divided by kDutyCycleFullScale.			*/
 		#endif
@@ -93,7 +101,7 @@
 	 
 		#define ISR_LOOP_CNT  ((uint16_t)(ISR_LOOP_US*(PWM_TIMER_FREQ_KHZ/1000)) )
 
-		#define  PWM_CYCLE_CNT	    ((uint16_t)((PWM_TIMER_FREQ_KHZ)/(PWM_FREQ_KHZ))	)
+		#define  PWM_CYCLE_CNT	    PWM_TIMER_FREQ_KHZ / PWM_FREQ_KHZ
 			 /**<Number of timer counts in one PWM cycle */
 
 		#define MAX_LOWX_CNT		( (uint16_t)(PWM_CYCLE_CNT - FET_SWITCH_TIME_CNT -1))
@@ -104,7 +112,13 @@
 			/**<Maximum absolute time the ePwmCommand_OFFx commands are allowed. Longer than this they conflict
 			 * with the ePwmCommand_ALLOFF command. Corresponds to timer counts since PWM cycle began*/	
 	
-	
+		
+		#ifndef PWM_SEQUENTIAL
+			#define COMMAND_T pwmCommand_T
+		#else
+			#define COMMAND_T pwmSequence_T
+		#endif
+		
 		
 	
 	
@@ -145,6 +159,7 @@ class bldcPwm
 				ePwmChannel_COUNT					
 			}pwmChannels_T;	
 
+#ifndef PWM_SEQUENTIAL
 
 		/************************************************************************************************/
 		/* ENUM: pwmCommand_E																			*/
@@ -155,35 +170,69 @@ class bldcPwm
 		 *  RULE #1 IS: Nobody talks about fight club... just kidding. 
 		 *  RULE #1 IS: The ePwmCommand_OFFx commands must be immediately after their ePwmCommand_OFFx
 		 *			    counterpart for the same channel.	See update method.							*/
-		/************************************************************************************************/		
+		/************************************************************************************************/						
 			typedef enum pwmCommand_E
-			{
-				ePwmCommand_START,	
-					/**<Start of the PWM Cycle. All channels are switch to high side to start the pulse width.
-					 *  (high side  A,B,C = on, low side A,B,C = off )										*/
-				ePwmCommand_OFFA,		
-					/**< The PWM on period has ended for channel A has expired. Turn off the high side fet
-	 				 *  so that both the high and the low side FET has are off, allowing time for the high 
-					 *  side FET to turn off.
-					 *  (Channel A - FET_HIGH = OFF, FET_LOW = OFF)											*/
-				ePwmCommand_LOWA,
-					/**< Assuming that the high side FET was successfully turned off, and the high side FET
-					 * was allowed time to settle to the off position, we will now turn on the low side FET 
-					 * of the h-bridge for channel A.
-					 *  (Channel A - FET_HIGH = OFF, FET_LOW = ON)											*/
-				ePwmCommand_OFFB, 	///< See eTimerCommand_OFFA. (Channel B - FET_HIGH = OFF, FET_LOW = OFF)
-				ePwmCommand_LOWB,	    ///< See eTimerCommand_LOWA	 (Channel B - FET_HIGH = OFF, FET_LOW = ON)
-				ePwmCommand_OFFC,		///< See eTimerCommand_OFFA. (Channel C - FET_HIGH = OFF, FET_LOW = OFF)
-				ePwmCommand_LOWC,     ///< See eTimerCommand_LOWA	 (Channel C - FET_HIGH = OFF, FET_LOW = ON)
-				ePwmCommand_ALLOFF,   
-					/**< The PWM cycle has completed, We will turn off all fets on all channels. There will be 
-					 *  a time delay between now, and eTimerCommand_START which will allow time for the FETs
-					 *  to respond to being shutoff, before turning back on again.
-					 *   (high side  A,B,C = OFF, low side A,B,C = OFF )									*/
-				ePwmCommand_END_OF_ENUM 
-					/**< This is used buy the software for determining if a variable of this type holds a valid 
-					 * value.																				*/
-			}pwmCommand_T;			
+			{															
+					ePwmCommand_START,	
+						/**<Start of the PWM Cycle. All channels are switch to high side to start the pulse width.
+						 *  (high side  A,B,C = on, low side A,B,C = off )										*/
+					ePwmCommand_OFFA,		
+						/**< The PWM on period has ended for channel A has expired. Turn off the high side fet
+	 					 *  so that both the high and the low side FET has are off, allowing time for the high 
+						 *  side FET to turn off.
+						 *  (Channel A - FET_HIGH = OFF, FET_LOW = OFF)											*/
+					ePwmCommand_LOWA,
+						/**< Assuming that the high side FET was successfully turned off, and the high side FET
+						 * was allowed time to settle to the off position, we will now turn on the low side FET 
+						 * of the h-bridge for channel A.
+						 *  (Channel A - FET_HIGH = OFF, FET_LOW = ON)											*/
+					ePwmCommand_OFFB, 	///< See eTimerCommand_OFFA. (Channel B - FET_HIGH = OFF, FET_LOW = OFF)
+					ePwmCommand_LOWB,	    ///< See eTimerCommand_LOWA	 (Channel B - FET_HIGH = OFF, FET_LOW = ON)
+					ePwmCommand_OFFC,		///< See eTimerCommand_OFFA. (Channel C - FET_HIGH = OFF, FET_LOW = OFF)
+					ePwmCommand_LOWC,     ///< See eTimerCommand_LOWA	 (Channel C - FET_HIGH = OFF, FET_LOW = ON)
+					ePwmCommand_ALLOFF,   
+						/**< The PWM cycle has completed, We will turn off all fets on all channels. There will be 
+						 *  a time delay between now, and eTimerCommand_START which will allow time for the FETs
+						 *  to respond to being shutoff, before turning back on again.
+						 *   (high side  A,B,C = OFF, low side A,B,C = OFF )									*/
+					ePwmCommand_END_OF_ENUM 
+						/**< This is used buy the software for determining if a variable of this type holds a valid 
+						 * value.																				*/				
+			}pwmCommand_T;	
+			
+#else
+		/************************************************************************************************/
+		/* ENUM: pwmSequence_E																		    */
+		/** Sequence states for ISR when using sequential PWM. When in PWM_SEQUENCE mode, these are the 
+		 *  different states which are executed by the ISR. In this case, the states are always executed
+		 *  in the order listed here. This is not used if PWM_SEQUENCE is not defined.
+		 *  When we engage each coil as follows:
+		 *
+		 *					|		BEFORE DELAY			|				AFTER DELAY				|
+		 *		Sequence	|	     TURN OFF FET(S)		|			   	 TURN ON FET(S)			|
+		 *		-------------------------------------------------------------------------------------
+		 *		ENGAGEA     |    C-HIGH, A-LOW			    |  C-LOW, A-HIGH, 
+		 *		ENGAGEB     |    A-HIGH, B-LOW				|  A-LOW, B-HIGH						|
+		 *		ENGAGEC     |	 B-HIGH, C-LOW				|  B-LOW, C-HIGH						|
+		 *		ALL-OFF		| LOW (A,B,C) HIGH (A,B,C)	    |  NOTHING								|	*/
+		/************************************************************************************************/		 
+			typedef enum pwmSequence_E
+			{		
+				ePwmSequence_ENGAGEA, ///< Engages the A Coil 					
+				ePwmSequence_ENGAGEB, ///< Engages the B Coil 										
+				ePwmSequence_ENGAGEC, ///< Engages the C Coil 					
+				ePwmSequence_ALLOFF,
+					/**< Extra optional step in the sequence where all FETS are turned off. This is used
+					 * to create "dead time" in order to control (reduce) the coil output current.		*/
+				ePwmSequence_END_OF_ENUM 
+					/**< This is not a state, this member is used to determine the ENUM size for data validation */									
+			}pwmSequence_T;	
+#endif	
+			
+			
+			
+			
+				
 			
 			
 
@@ -276,7 +325,7 @@ class bldcPwm
 						* used on a previous sort so that we dont reuse the entry on the next sort.			*/			
 			}pwmChannelEntry_T;								 
 			
-			
+#ifndef PWM_SEQUENTIAL			
 			/************************************************************************************************/
 			/* STRUCT: pwmSortList_S  																	*/
 			/**<	Holds an entry for the preliminary list of pwm timer events. Includes 
@@ -294,7 +343,7 @@ class bldcPwm
 					/**< This is used for sorting of the list, it is the array index of the entry which 
 						* is next in the sort order. 0 Indicates its the last entry in list.				*/												
 			}pwmSortList_T;
-					
+#endif					
 					
 					
 
@@ -340,32 +389,22 @@ class bldcPwm
 		/*------------------------------------------------------------------------------------------*/
 		{
 						
-			/* In the case of PWM_CYCLE_COUNT  = 16000 and kDutyCycleFullScale = 1023
-			 * 16000/1023 = 15 which divides exactly so we can pre-divide it and also 
-			 * 1023 (the max value for "value") *15 = 16,000 which is safely a 16bit integer.
-			 *  Previously this function returned:
-			 *
-			 *  
-			 *
-			 *  which is safer if we keep changing PWM_CYCLE_CNT and kDutyCycleFullScale
-			 *  but is also a lot slower.
-			 *    Here are the "Safe" pwm frequencies which will work with this function:
-			 *
-			 *       PWM Speed      PWM_CYCLE_COUNT     Division Result    Safe ?
-			 *	     1Khz			16000				15					Yes
-			 *		 2Khz			8000				7					Yes
-			 *		 3Khz			5333.333			5.213				No
-			 *		 4Khz			4000				3.91				No
-			 *		 Others Not Safe Too			
-			 */
+			/* IF WE ABIDE BY THE FOLLOWING GUIDELINE, THIS CALCULATION BECOMES MUCH FASTER
+			
+				1) Set kDutyCycleFullScale to 1000
+				2) Have a timer clock speed which is a multiple of 16000
+				3) Limit PWM Frequencies to 1,2,4,8 and 16 Khz
 				
-			#ifdef FAST_PWM_DURATION_CALC			
+				If this is done, we can predivide PWM_CYCLE_CNT/kDutyCycleFullScale. This gets
+				us <5us vs >100 us for the calculation. */
+					
+			
+			#if PWM_CYCLE_CNT % kDutyCycleFullScale == 0
 				return	value*(PWM_CYCLE_CNT/kDutyCycleFullScale) ; 
 			#else
 			    return ((int32_t)PWM_CYCLE_CNT * (int32_t)value  ) / kDutyCycleFullScale;	 
-			#endif	
-				
-			
+				#warning "PWM_CYCLE_CNT/kDutyCycleFullScale does not divide cleanly, using dynamic calculation which takes a LONG time."
+			#endif								
 		}
 		
 		
