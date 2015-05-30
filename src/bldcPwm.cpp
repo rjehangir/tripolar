@@ -301,7 +301,7 @@ bool checkISRData(pwmEntry_T  *table);
 		{
 			OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
  			DEBUG_OUT(0x08);
-			redOn();
+			//redOn();
 			bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.		
 			if (!pwmIsrData.enabled) return;
 			for (int i=0;i<10;i++) {	//Repeat up to 11 times if deltaTime keeps being too short		
@@ -374,7 +374,7 @@ bool checkISRData(pwmEntry_T  *table);
 				} //END IF  (!isrExitMode_Loop)
 				TCNT1 = 0;
 			} //END repeat (for loop)		
-		redOff();	
+	//	redOff();	
 		DEBUG_OUT(0x0B);
 		} //END FUNCTION
 
