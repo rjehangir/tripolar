@@ -173,7 +173,8 @@ class bldcGimbal
 		inline uint16_t sineToDutyCycle(uint8_t value)
 		{
 			#ifndef PWM_SEQUENTIAL
-				return 4*value;
+				#define GENERIC_SCALER 64U
+				return (( uint16_t)value * ((kDutyCycleFullScale * GENERIC_SCALER) / 255))/ GENERIC_SCALER;
 			#else
 				#define GENERIC_SCALER 64U
 				
