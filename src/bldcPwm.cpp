@@ -326,7 +326,7 @@ bool checkISRData(pwmEntry_T  *table);
 						incEntry = true;
 						break;
 					case bldcPwm::ePwmSequence_ENGAGEC:
-						BpFETOff();
+						BpFETOff(); 
 						CnFETOff();
 						_delay_us(kFetSwitchTime_uS);
 						BnFETOn();
