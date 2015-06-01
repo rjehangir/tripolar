@@ -22,7 +22,7 @@
 
 
 
-	#define PWM_SEQUENTIAL
+	//#define PWM_SEQUENTIAL
 			/**< When NOT defined, the PWM triggers each pulse in parallel, so that the rising edge 
 			 *   for all three channel occurs at the same time. When DEFINED, each pulse will be 
 			 *   triggered sequentially, so that the rising edge of the next channel, occurs

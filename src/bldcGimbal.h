@@ -20,7 +20,7 @@
 &&& USER CONFIGURATION
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */
-	#define COIL_RATIO  6  
+	#define COIL_RATIO  7  
 				/**< The number of sine cycles each coil needs to go through for motor to 
 				 * make on rotation																				*/
 /*
