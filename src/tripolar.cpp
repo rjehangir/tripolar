@@ -29,6 +29,7 @@
 
 #include <util/delay.h>
 #include "millis.h"
+#include <stdlib.h>
 
 
 /*
@@ -41,6 +42,28 @@ void setup(void);
 void loop(void);
 
 
+
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& STRUCTURES
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/
+
+/*****************************************************************************************************/
+/* STRUCT: servoIsrData_S																			 */
+/** Data structure used to interact with the Servo Interrupt service routine						 */
+/*****************************************************************************************************/
+typedef struct servoIsrData_S
+{
+																
+	
+	volatile uint16_t startTimeStamp;
+	volatile uint16_t stopTimeStamp;
+	bool dataReady;
+	
+}servoIsrData_T;
+
+
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& VARIABLES
@@ -48,7 +71,72 @@ void loop(void);
 */
 
 bldcGimbal gimbal;
+static servoIsrData_T servoIsrData;
 
+
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& INTERRUPT SERVICE ROUTINES
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/
+
+ISR(INT0_vect)
+{
+	volatile uint16_t timeStamp;
+	timeStamp = micros();
+	if (servoIsrData.dataReady) return; //we already have a reading, so don't collect a new one till this one is read.
+   
+	if ((PINB & _BV(PINB0)) != 0) servoIsrData.startTimeStamp = timeStamp;  //If Rising Edge, record the start time
+	else  //Otherwise its a falling edge so ..	
+	{
+		servoIsrData.stopTimeStamp = timeStamp;	//Record the stop time..
+		servoIsrData.dataReady = true;			//And signal that we have a value
+	}
+}
+
+
+
+/*
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&& SERVO ISR SUPPORT FUNCTIONS
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+*/
+
+
+inline void servo_begin(void)
+{
+	servoIsrData.dataReady = false;
+	
+	//Configure PCINT0 PIN (PB0) as an input
+	DDRB &= ~_BV(DDB0);
+	
+	//DISABLE PULLUP RESISTOR (PB0)
+	PORTB &= ~_BV(PORTB0);
+	
+	//The low level of INT0 generates an interrupt request
+	MCUCR &=	~_BV(ISC01);
+	MCUCR |= _BV(ISC00);
+	
+	//Enable External Interrupt INT0
+	GICR |= _BV(INT0); 
+	
+	
+}
+
+
+
+inline bool servo_changed(void)
+{
+	return servoIsrData.dataReady;	
+}
+
+
+inline uint16_t servo_value_uS(void)
+{
+	uint16_t retVal = servoIsrData.stopTimeStamp - servoIsrData.startTimeStamp;
+	servoIsrData.dataReady = false;
+	return retVal;
+}
 
 
 /*
@@ -73,6 +161,7 @@ void setup(void)
 	greenOn();
 	millis_init();
 	gimbal.begin();
+	servo_begin();
 }
 
 
@@ -86,56 +175,23 @@ typedef enum accState_E
 
 void loop(void)
 {
-	static uint32_t lastTime = 0;
-	static uint16_t currentSpeed = 0;
-	static accState_T state = eAccState_START;
-	static bool doRamp = false;
-	static uint32_t stateTimer = 0;
-	static uint16_t speedTarget = 0;
+	static int16_t currentSpeed = 0;
+	static uint16_t lastServo = 0;
+	uint16_t currentServo;
 	
 	
-	
-	switch (state)
+	if (servo_changed()) 
 	{
-		case eAccState_START:
-			stateTimer = _100us;
-			state = eAccState_INITIAL_RAMP;
-			doRamp = false;
-			break;
-		case eAccState_INITIAL_RAMP:
-			doRamp = true;
-			if (currentSpeed >= 200) {
-				stateTimer = _100us;
-				state = eAccState_HOLD;
-			}
-			break;
-		case eAccState_HOLD:			
-			doRamp = false;
-			if (_100us - stateTimer >= 150000) {			//15  seconds
-				stateTimer = _100us;
-				state = eAccState_NEXT_SPEED;	
-				speedTarget = currentSpeed + 50;
-			}
-			break;
-			
-		case eAccState_NEXT_SPEED:
-			doRamp = true;
-			if (speedTarget == currentSpeed) {
-				state = eAccState_HOLD;
-				stateTimer = _100us;
-			}
-			break;
-		default:			
-			doRamp = false;	
+		currentServo = servo_value_uS();
+		if (currentServo != lastServo)
+		{
+			currentSpeed = abs(currentServo - 1500)*2;
+			lastServo = currentServo;
+			gimbal.set_speed_rpm(currentSpeed);		
+		}
 	}
-			
-	if (_100us-lastTime >=400 && doRamp)
-	{
-		lastTime = _100us;
-		currentSpeed++;		
-		gimbal.set_speed_rpm(currentSpeed);					
-	}
-		
+						
 	gimbal.tickle();	
 }
+
 
