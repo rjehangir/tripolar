@@ -170,8 +170,8 @@
 			if (_incrementDelay_100us == 0) _accumulator = 0;
 			else
 			{
-				if (_100us - _incrementTimer >= _incrementDelay_100us){
-					_incrementTimer = _100us;
+				if (timer16_us/100 - _incrementTimer >= _incrementDelay_100us){
+					_incrementTimer = timer16_us/100;
 					_accumulator++;
 				}				
 			}
