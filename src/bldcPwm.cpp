@@ -213,6 +213,7 @@ bool checkISRData(pwmEntry_T  *table);
 
 	ISR(TIMER1_COMPA_vect) 
 	{
+		sei();
 		OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
  		DEBUG_OUT(0x08);
 		//redOn();

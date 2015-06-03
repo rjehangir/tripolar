@@ -83,6 +83,7 @@ static servoIsrData_T servoIsrData;
 
 ISR(TIMER1_CAPT_vect)
 {
+	sei();
 	volatile uint16_t timeStamp;	
 	timeStamp = micros();
 	if (servoIsrData.dataReady) return; //we already have a reading, so don't collect a new one till this one is read.
