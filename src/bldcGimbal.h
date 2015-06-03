@@ -119,6 +119,7 @@ class bldcGimbal
 			/**< Holds the motor current PWM setting for the first coil. This is controls the relative
 			 * position within each of the motor's coils. Note that most motors have multiple coil pairs
 			 * so a full rotation will require more than one full cycle (2-255) of this property.		*/					
+		 bool _reverse; //When true the motor goes in reverse, otherwise it goes forward.				*/			
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	&&& PUBLIC METHODS
@@ -155,7 +156,7 @@ class bldcGimbal
 			&&& MUTATORS
 			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 			*/
-					void set_speed_rpm(uint16_t value); 
+					void set_speed_rpm(int16_t value); 
 						 /**< Mutator Method. See corresponding private property for more info.					*/
 
 	/*

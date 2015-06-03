@@ -19,6 +19,7 @@
 */
 	#include "millis.h"
 	#include "bldcGimbal.h"
+	#include <stdlib.h>
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& MACROS
@@ -189,14 +190,17 @@
 	*	Description:
 	*		See class header file for a full API description of this method
 	****************************************************************************/				 
-	void bldcGimbal::set_speed_rpm(uint16_t value)
-	{
+	void bldcGimbal::set_speed_rpm(int16_t value)
+	{						
 		if(value ==0)
 		{
 			_incrementDelay_100us = 0;
 			_baseIncrement = 0;
 			return;
 		}
+		
+		if (value < 0) _reverse = true;
+		else _reverse = false;
 		_speed_rpm = value;
 		uint32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
 		numerator *= value;
@@ -220,8 +224,9 @@
 				
 		uint16_t pwmA,pwmB,pwmC;
 		uint8_t indexA,indexB,indexC;
-	
-		_currentStep += value;
+		
+		if (_reverse) _currentStep -= value;
+		else _currentStep += value;
 	
 		indexA = _currentStep;
 		indexB = _currentStep + PHASE_SHIFT;

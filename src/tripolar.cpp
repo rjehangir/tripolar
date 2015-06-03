@@ -60,8 +60,9 @@ typedef struct servoIsrData_S
 	volatile uint16_t startTimeStamp;
 	volatile uint16_t stopTimeStamp;
 	bool dataReady;
+	bool waitRising; //If true, we are waiting for a rising edge, otherwise a falling
 	
-}servoIsrData_T;
+}servoIsrData_T;   
 
 
 /*
@@ -80,17 +81,23 @@ static servoIsrData_T servoIsrData;
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */
 
-ISR(INT0_vect)
+ISR(TIMER1_CAPT_vect)
 {
-	volatile uint16_t timeStamp;
+	volatile uint16_t timeStamp;	
 	timeStamp = micros();
 	if (servoIsrData.dataReady) return; //we already have a reading, so don't collect a new one till this one is read.
    
-	if ((PINB & _BV(PINB0)) != 0) servoIsrData.startTimeStamp = timeStamp;  //If Rising Edge, record the start time
+	if (servoIsrData.waitRising) {
+		servoIsrData.startTimeStamp = timeStamp;  //If Rising Edge, record the start time						
+		TCCR1B &= ~_BV(ICES1);//Set interrupt for falling edge
+		servoIsrData.waitRising = false;
+	}
 	else  //Otherwise its a falling edge so ..	
 	{
 		servoIsrData.stopTimeStamp = timeStamp;	//Record the stop time..
 		servoIsrData.dataReady = true;			//And signal that we have a value
+		servoIsrData.waitRising = true;
+		TCCR1B |= _BV(ICES1); //Set interrupt for rising edge				
 	}
 }
 
@@ -105,7 +112,9 @@ ISR(INT0_vect)
 
 inline void servo_begin(void)
 {
+	//sei(); //Enable nested interrupts
 	servoIsrData.dataReady = false;
+	servoIsrData.waitRising = true;
 	
 	//Configure PCINT0 PIN (PB0) as an input
 	DDRB &= ~_BV(DDB0);
@@ -113,12 +122,11 @@ inline void servo_begin(void)
 	//DISABLE PULLUP RESISTOR (PB0)
 	PORTB &= ~_BV(PORTB0);
 	
-	//The low level of INT0 generates an interrupt request
-	MCUCR &=	~_BV(ISC01);
-	MCUCR |= _BV(ISC00);
+	//Rising Edge Detect
+	TCCR1B |= _BV(ICES1);
 	
-	//Enable External Interrupt INT0
-	GICR |= _BV(INT0); 
+	//Enable Input Compare Interrupt
+	TIMSK |= _BV(TICIE1);
 	
 	
 }
@@ -178,16 +186,26 @@ void loop(void)
 	static int16_t currentSpeed = 0;
 	static uint16_t lastServo = 0;
 	uint16_t currentServo;
+	static int16_t averageSpeed = 0;
 	
 	
 	if (servo_changed()) 
 	{
-		currentServo = servo_value_uS();
+		currentServo = servo_value_uS();	
+		if ((currentServo-1500)>0)
+		{
+			asm("NOP");
+		}	
 		if (currentServo != lastServo)
 		{
-			currentSpeed = abs(currentServo - 1500)*2;
-			lastServo = currentServo;
-			gimbal.set_speed_rpm(currentSpeed);		
+			if (currentServo < 2000 && currentServo > 1000) 
+			{
+				currentSpeed = (currentServo - 1500)*2;
+				averageSpeed = ((averageSpeed*9) + (currentSpeed*1))/10;
+				lastServo = currentServo;
+			 	//gimbal.set_speed_rpm(currentSpeed);		
+				gimbal.set_speed_rpm(averageSpeed);		
+			}
 		}
 	}
 						

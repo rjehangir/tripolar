@@ -7,7 +7,7 @@ uint8_t timerCycles;
 
 ISR(TIMER0_OVF_vect)
 {
-	TCNT0 = 59; 
+	TCNT0 += 57; 
 	timer16_us += 100;		
 	if (++timerCycles >= 10){
 		timerCycles = 0;

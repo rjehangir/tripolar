@@ -49,6 +49,7 @@
       </ToolNumber>
       <ToolName xmlns="">Simulator</ToolName>
     </com_atmel_avrdbg_tool_simulator>
+    <StimuliFile>C:\Users\Alan\Documents\Atmel Studio\6.2\tripolar\prj\servo.stim</StimuliFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <ToolchainSettings>
