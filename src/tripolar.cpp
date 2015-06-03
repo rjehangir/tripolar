@@ -113,7 +113,7 @@ ISR(TIMER1_CAPT_vect)
 
 inline void servo_begin(void)
 {
-	//sei(); //Enable nested interrupts
+	sei(); //Enable nested interrupts
 	servoIsrData.dataReady = false;
 	servoIsrData.waitRising = true;
 	
@@ -210,7 +210,7 @@ void loop(void)
 			if (currentServo < 2000 && currentServo > 1000) 
 			{
 				currentSpeed = (currentServo - 1500)*2;
-				averageSpeed = ((averageSpeed*9) + (currentSpeed*1))/10;
+				averageSpeed = ((averageSpeed*7) + (currentSpeed*3))/10;
 				lastServo = currentServo;
 			 	//gimbal.set_speed_rpm(currentSpeed);		
 				gimbal.set_speed_rpm(averageSpeed);		
