@@ -151,6 +151,8 @@ class bldcGimbal
 			 
 					inline uint16_t speed_rpm(void){return _speed_rpm;};
 						 /**< Accessor Method. See corresponding private property for more info.				*/
+					inline bldcPwm motorPwm (void){return _motorPwm;} 
+						 /**< Accessor Method. See corresponding private property for more info.				*/
 			/*
 			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 			&&& MUTATORS
