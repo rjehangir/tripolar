@@ -123,6 +123,12 @@
 						*	doing anything.		
 						*  DEFAULT: false																	*/		
 				//uint16_t startTime; //Timer value when 	
+				volatile bool icr1Conflict; 
+					/**< True if the ICR1 triggered while this ISR ran. Since this ISR takes a relatively
+					 * long time and we are unable to use the input compare register on timer one due to 
+					 * not allowing the timer to free-run, we report if this interrupt routine could have 
+					 * possibly delayed the response time of an IRQ servicing the timer1 input compare.
+					 * This is accessable using the _icr1Conflict accessor method.							*/
 
 			}pwmIsrData_T;		
 			
@@ -209,7 +215,7 @@ bool checkISRData(pwmEntry_T  *table);
 	{
 		OCR1A = PWM_CYCLE_CNT;  //Allow us to count freely so we know how long we are in ISR
  		DEBUG_OUT(0x08);
-		redOn();
+		//redOn();
 		bool incEntry = true; //When true, ISR will increment the pwmIsrData.pEntry pointer before exiting.		
 		if (!pwmIsrData.enabled) return;
 		
@@ -290,7 +296,11 @@ bool checkISRData(pwmEntry_T  *table);
 			} //END if (!isrExitMode_Loop)
 			TCNT1 = 0;	
 		} //END repeat (for loop)		
-	redOff();	
+	
+	if ((TIFR & _BV(ICF1)) != 0) pwmIsrData.icr1Conflict = true; 	
+		/*Check to see if an  input compare event occurred during the service of this interrupt.
+		 * This can be used to warn other processes do disregard the current data.*/
+	//redOff();	
 	DEBUG_OUT(0x0B);
 	} //END Function
 	
@@ -405,6 +415,7 @@ bool checkISRData(pwmEntry_T  *table);
 			pwmIsrData.pEntry =  pwmIsrData.tableA;
 			pwmIsrData.changeTable =  false;
 			pwmIsrData.enabled =  true;
+			pwmIsrData.icr1Conflict = false;
 			
 			memcpy((void *)pwmIsrData.tableA,(const void *)pwmInit,sizeof(pwmInit));					
 			for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;		
@@ -815,4 +826,18 @@ void  bldcPwm::updateISR(void)
 	void bldcPwm::isrEnable(bool isEnable)
 	{
 		pwmIsrData.enabled = isEnable;
+	}
+	
+	
+	/****************************************************************************
+	*  Class: bldcPwm
+	*  Method: icr1Conflict
+	*	Description:
+	*		See class header file for a full API description of this method
+	****************************************************************************/	
+    bool bldcPwm::icr1Conflict(void) 
+	{ 
+		bool retVal = pwmIsrData.icr1Conflict;
+		pwmIsrData.icr1Conflict = false;		
+		return retVal;
 	}

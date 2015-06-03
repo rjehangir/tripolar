@@ -291,9 +291,18 @@ class bldcPwm
 					
 			}
 			
+			 
+			 bool icr1Conflict(void);
+			/**< Returns true if a timer 1 input compare event occured while the 
+			 * pwm ISR was running. As out interrupt will delay the input compare irq,
+			 * this allows other code modules to check if the result will be suspect. Normally
+			 * delays on handling the input compare events dont matter because they are time
+			 * stamped by timer one, but, in this module we are not allowing timer1 to free
+			 * run, so the stamped data is useless.														 */
+			 /*------------------------------------------------------------------------------------------*/
+			 									
 			 bool busy(void);
 			/**< Indicates if the ISR has not loaded the previous value
-			 * @return true if the ISR can not accept a new PWM value. */
 			
 			 void isrEnable(bool isEnabled);
 			

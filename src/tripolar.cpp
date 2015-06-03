@@ -135,6 +135,13 @@ inline void servo_begin(void)
 
 inline bool servo_changed(void)
 {
+	if (servoIsrData.dataReady)
+	{		
+		if (gimbal.motorPwm().icr1Conflict()) {
+			servoIsrData.dataReady = false;		
+			redOn();				
+		}
+	}						 	
 	return servoIsrData.dataReady;	
 }
 
@@ -142,6 +149,7 @@ inline bool servo_changed(void)
 inline uint16_t servo_value_uS(void)
 {
 	uint16_t retVal = servoIsrData.stopTimeStamp - servoIsrData.startTimeStamp;
+	redOff();	
 	servoIsrData.dataReady = false;
 	return retVal;
 }
