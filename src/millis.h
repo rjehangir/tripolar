@@ -43,6 +43,6 @@
 		inline uint16_t micros(void)
 		{
 		    
-			return timer16_us  + TCNT0 *4;			
+			return timer16_us  + (TCNT0-59) /2;			
 		}
 #endif
