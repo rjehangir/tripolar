@@ -202,8 +202,9 @@
 		if (value < 0) _reverse = true;
 		else _reverse = false;
 		_speed_rpm = value;
-		uint32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
-		numerator *= value;
+		uint16_t speed = abs(value);
+		int32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
+		numerator *= speed;
 		numerator *= 1000;
 		uint32_t denomenator = 	PWM_INCREMENT_SCALER_DENOMENATOR;
 		uint32_t calcValue = numerator / denomenator;
