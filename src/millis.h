@@ -29,11 +29,24 @@
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 */	
 		inline void millis_init(void)
-		{
-			TCCR0 = 0x02; //Init Timer0, normal, prescalar = 64 (250Khz Clock Rate)
-			TCNT0 = 59; //Count up from 55 which makes the timer expire in 200 cycles.
-			TIMSK |= _BV(TOIE0); //Set TOIE bit
+		{			
+			/*
+			TCCR2 |= 
+					_BV(WGM21) | ~_BV(WGM20) |     //CTC mode (reset timer after expire
+				    ~_BV(COM21) | ~_BV(COM20)  | //No Output Compare Match Pin
+					~_BV(CS22) | _BV(CS21) | ~_BV(CS20);  //Clock Prescale /8 (2Mhz)*/
 			
+			TCCR2 = 0;
+			TCCR2 |= _BV(WGM21);
+			TCCR2 |= _BV(CS21);
+			
+			
+			
+			TCNT2 = 0;			
+			OCR2 = 199; //Expire after 100uS
+			ASSR = 0; //Dont use asych clock, use i/o clock.
+			TIMSK |= _BV(OCIE2); //Set Output compare interrupt
+											
 			timer32_ms = 0;
 			timer16_us = 0;
 			timerCycles = 0;
@@ -43,6 +56,6 @@
 		inline uint16_t micros(void)
 		{
 		    
-			return timer16_us  + (TCNT0-59) /2;			
+			return timer16_us  + (TCNT2) /2;			
 		}
 #endif
