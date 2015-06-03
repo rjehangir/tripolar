@@ -303,8 +303,15 @@ class bldcPwm
 			 									
 			 bool busy(void);
 			/**< Indicates if the ISR has not loaded the previous value
+			 * @return true if the ISR can not accept a new PWM value.									 */
+			 /*------------------------------------------------------------------------------------------*/
 			
 			 void isrEnable(bool isEnabled);
+			/** Used to turn on and off the pwm interrupt service routine.
+			 * @param isEnabled
+			 *		Set to true  to turn on the isr, false to turn if off								*/
+			/*------------------------------------------------------------------------------------------*/
+			 
 			
 		
 	/*
