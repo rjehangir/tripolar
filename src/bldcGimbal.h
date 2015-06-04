@@ -320,13 +320,22 @@ class bldcGimbal
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	*/	private:			
 	
+	
+	
+	
 		void incrementRotor(uint8_t value);
 		/**< Increments the motor by the specied number of positions 
 		*	@param value
-		*		The number of positions to increment the motor by.									 */
+		*		The number of positions to increment the motor by.									*/
 		/*------------------------------------------------------------------------------------------*/
 					
 		inline uint16_t sineToDutyCycle(uint8_t value)
+		/**< Scales an 8 but sine value into a valid duty cycle value.
+		 * @param value
+		 *     8 bit sine value.
+		 * @return
+		 *     A value PWM duty cycle value.														*/
+		/*------------------------------------------------------------------------------------------*/		 
 		{
 			#ifndef PWM_SEQUENTIAL
 				#define GENERIC_SCALER 64U
@@ -344,6 +353,14 @@ class bldcGimbal
 				   limit the work to 1 16bit multiple and 1 16 bit divide.  */				
 			#endif
 		}
+				
+		void calcPowerScale(uint16_t speed);
+		/**< Given a speed (in RPM) calculates the percent power which should be applied (based on values in the 
+		 * user configuration). It then sets _powerScale to the proper value.								 
+		 * @param speed
+		 *    The speed in RPM to use when calculating the power											 */
+		/*---------------------------------------------------------------------------------------------------*/
+		
 					
 					
 					

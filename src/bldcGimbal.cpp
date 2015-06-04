@@ -251,6 +251,28 @@
 	};	
 	
 	
+	/****************************************************************************
+	*  Class: bldcGimbal
+	*  Method: calcPowerScale
+	*	Description:
+	*		See class header file for a full API description of this method
+	****************************************************************************/		
+	void bldcGimbal::calcPowerScale(uint16_t speed)
+	{							
+			uint16_t powerScale1 = POWER_CENTER_OFFSET + (((100/4)*abs(speed )) /(POWER_CENTER_INTERCEPT/4));  
+			uint16_t powerScale2 = POWER_SPEED_OFFSET  + (((100/4)*abs(speed )) /(POWER_SPEED_INTERCEPT /4));								
+					/* The actual equation is :
+					*	 powerScale = OFFSET + 100 * currentSpeed / INTERCEPT
+					*	 					
+					* We need to prevent having a number larger than 65535 during the calculation 
+					* We will assume that the maximum currentSpeed will be 2000 RPM, we will get a 
+					* maximum of 100*2000 = 200,000 during calculation. To keep this within range
+					* we need to pre-divide it by 4 resulting in a max value of 50,000 during calculation.
+					*--------------------------------------------------------------------------------------------*/
+			set_PowerScale(powerScale1>powerScale2?powerScale2:powerScale1);		
+	}
+	
+	
 	
 	
 	/****************************************************************************
@@ -278,43 +300,25 @@
 				//Disregard if the value is out of range
 				if (currentServo < SERVO_MAX_US && currentServo > SERVO_MIN_US)
 				{	
-					/*
-					------------------------------------------------------------------------------------------------
-					 SCALE FROM SERVO TO RPM
-					--------------------------------------------------------------------------------------------------
-					*/						
-					currentSpeed = currentServo - SERVO_CENTER_US;
 					
-					//Choose Correct Sign For Deadzone									
-					int8_t deadZone = (currentSpeed<0? -1 * DEADZONE_US : DEADZONE_US);									
+					//------------------------------------------------------------------------------------------------
+					//	SCALE FROM SERVO TO RPM
+					//------------------------------------------------------------------------------------------------
+					{					
+						currentSpeed = currentServo - SERVO_CENTER_US;
 					
-					//Scale current Speed and adjust for deadzone.
-					currentSpeed = (abs(currentSpeed)<=DEADZONE_US?0:(SPEED_SCALE*((currentSpeed-deadZone)))/10);
+						//Choose Correct Sign For Deadzone									
+						int8_t deadZone = (currentSpeed<0? -1 * DEADZONE_US : DEADZONE_US);									
 					
-					//Implement Averaging (if enabled)
-					#ifdef AVERAGING_ENABLED
-						currentSpeed = averageSpeed = ((averageSpeed*AVERAGING_RATE) + (currentSpeed*(10-AVERAGING_RATE)))/10;
-					#endif
-						
+						//Scale current Speed and adjust for deadzone.
+						currentSpeed = (abs(currentSpeed)<=DEADZONE_US?0:(SPEED_SCALE*((currentSpeed-deadZone)))/10);
 					
-					/*
-					------------------------------------------------------------------------------------------------
-					 CALCULATE POWER SCALING 
-					--------------------------------------------------------------------------------------------------
-					*/								
-					uint16_t powerScale1 = POWER_CENTER_OFFSET + ((100/4)*abs(currentSpeed)/(POWER_CENTER_INTERCEPT/4));  
-					uint16_t powerScale2 = POWER_SPEED_OFFSET + ((100/4)*abs(currentSpeed) /(POWER_SPEED_INTERCEPT/4));								
-						 /* The actual equation is :
-						  *	 powerScale = OFFSET + 100 * currentSpeed / INTERCEPT
-						  *	 					
-						  * We need to prevent having a number larger than 65535 during the calculation 
-						  * We will assume that the maximum currentSpeed will be 2000 RPM, we will get a 
-						  * maximum of 100*2000 = 200,000 during calculation. To keep this within range
-						  * we need to pre-divide it by 4 resulting in a max value of 50,000 during calculation.
-						  *--------------------------------------------------------------------------------------------*/
-					set_PowerScale(powerScale1>powerScale2?powerScale2:powerScale1);															
-					
-					
+						//Implement Averaging (if enabled)
+						#ifdef AVERAGING_ENABLED
+							currentSpeed = averageSpeed = ((averageSpeed*AVERAGING_RATE) + (currentSpeed*(10-AVERAGING_RATE)))/10;
+						#endif
+					}
+					calcPowerScale(currentSpeed);  //Calculate what the power scale should be and set it.
 					set_speed_rpm(currentSpeed);					
 				} //If Value Out Of Range
 			} //If value unchanged
