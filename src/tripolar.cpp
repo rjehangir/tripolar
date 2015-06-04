@@ -198,15 +198,15 @@ typedef enum accState_E
 void loop(void)
 {
 	static int16_t currentSpeed = 0;
-	static uint16_t lastServo = 0;
-	uint16_t currentServo;
+	static int16_t lastServo = 0;
+	int16_t currentServo;
 	static int16_t averageSpeed = 0;
 	
 	
 	if (servo_changed()) 
 	{
 		currentServo = servo_value_uS();	
-		if ((currentServo-1500)>0)
+		if (abs(currentServo-1500)>1)
 		{
 			asm("NOP");
 		}	
@@ -214,7 +214,7 @@ void loop(void)
 		{
 			if (currentServo < 2000 && currentServo > 1000) 
 			{
-				currentSpeed = (currentServo - 1500)*2;
+				currentSpeed = (11*(currentServo - 1500))/10;
 				averageSpeed = ((averageSpeed*7) + (currentSpeed*3))/10;
 				lastServo = currentServo;
 				uint8_t powerScale = 1 + (3*abs(currentSpeed) /350);
