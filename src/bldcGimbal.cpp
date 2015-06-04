@@ -192,7 +192,9 @@
 	*		See class header file for a full API description of this method
 	****************************************************************************/				 
 	bool bldcGimbal::set_speed_rpm(int16_t value)
-	{						
+	{	
+		
+		calcPowerScale(value);  //Calculate what the power scale should be and set it.							
 		if(value ==0)
 		{
 			_incrementDelay_100us = 0;
@@ -239,8 +241,7 @@
 		pwmA = sineToDutyCycle(pwmSin[indexA]);
 		pwmB = sineToDutyCycle(pwmSin[indexB]);
 		pwmC = sineToDutyCycle(pwmSin[indexC]);
-		
-			
+					
 		_motorPwm.set_pwm(bldcPwm::ePwmChannel_A,pwmA);
 		_motorPwm.set_pwm(bldcPwm::ePwmChannel_B,pwmB);
 		_motorPwm.set_pwm(bldcPwm::ePwmChannel_C,pwmC);
@@ -317,8 +318,7 @@
 						#ifdef AVERAGING_ENABLED
 							currentSpeed = averageSpeed = ((averageSpeed*AVERAGING_RATE) + (currentSpeed*(10-AVERAGING_RATE)))/10;
 						#endif
-					}
-					calcPowerScale(currentSpeed);  //Calculate what the power scale should be and set it.
+					}					
 					set_speed_rpm(currentSpeed);					
 				} //If Value Out Of Range
 			} //If value unchanged
