@@ -217,8 +217,13 @@ void loop(void)
 				currentSpeed = (currentServo - 1500)*2;
 				averageSpeed = ((averageSpeed*7) + (currentSpeed*3))/10;
 				lastServo = currentServo;
-			 	//gimbal.set_speed_rpm(currentSpeed);		
-				gimbal.set_speed_rpm(averageSpeed);		
+				uint8_t powerScale = 1 + (3*abs(currentSpeed) /350);
+				//uint8_t powerScale = 4;
+				
+				gimbal.set_PowerScale(powerScale);
+				
+			 	gimbal.set_speed_rpm(currentSpeed);		
+				//gimbal.set_speed_rpm(currentSpeed);		
 			}
 		}
 	}

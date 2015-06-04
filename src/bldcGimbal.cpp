@@ -143,7 +143,8 @@
 		 _incrementDelay_100us = 1000;  			
 		 _accumulator = 0; 									 		
 		 _incrementTimer = 0;									
-		 _currentStep = 0;			
+		 _currentStep = 0;	
+		 _powerScale = 4;				
 	}
 			
 	/****************************************************************************

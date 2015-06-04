@@ -119,6 +119,9 @@ class bldcGimbal
 			/**< Holds the motor current PWM setting for the first coil. This is controls the relative
 			 * position within each of the motor's coils. Note that most motors have multiple coil pairs
 			 * so a full rotation will require more than one full cycle (2-255) of this property.		*/					
+		 uint8_t _powerScale;			
+			/**< A number between 0 and 10 which controls the power output going to the motor. 10 is
+			 * full power, 0 is no power																*/
 		 bool _reverse; //When true the motor goes in reverse, otherwise it goes forward.				*/			
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -153,6 +156,8 @@ class bldcGimbal
 						 /**< Accessor Method. See corresponding private property for more info.				*/
 					inline bldcPwm motorPwm (void){return _motorPwm;} 
 						 /**< Accessor Method. See corresponding private property for more info.				*/
+					inline uint8_t powerScale(void) {return _powerScale;}
+						 /**< Accessor Method. See corresponding private property for more info.				*/
 			/*
 			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 			&&& MUTATORS
@@ -160,6 +165,14 @@ class bldcGimbal
 			*/
 					void set_speed_rpm(int16_t value); 
 						 /**< Mutator Method. See corresponding private property for more info.					*/
+					inline bool set_PowerScale(uint8_t value) 
+						/**< Mutator Method. See corresponding private property for more info.					*/
+					{
+						_powerScale = value;
+						if(_powerScale >4) _powerScale = 4;
+						return true;
+					}
+						 
 
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -177,11 +190,11 @@ class bldcGimbal
 		{
 			#ifndef PWM_SEQUENTIAL
 				#define GENERIC_SCALER 64U
-				return (( uint16_t)value * ((kDutyCycleFullScale * GENERIC_SCALER) / 255))/ GENERIC_SCALER;
+				return ((uint16_t) _powerScale *( uint16_t)value * (((kDutyCycleFullScale/4) * GENERIC_SCALER) / 255))/ (GENERIC_SCALER);
 			#else
 				#define GENERIC_SCALER 64U
 				
-				return ( value*(uint16_t)((kDutyCycleFullScale * GENERIC_SCALER) / SINE_TOTAL))/(GENERIC_SCALER);
+				return ((uint16_t) _powerScale * value*(uint16_t)(((kDutyCycleFullScale/4) * GENERIC_SCALER) / SINE_TOTAL))/(GENERIC_SCALER);
 					/* THE EQUATION IS  
 								value*(255/SINE_TOTAL)*(1023/255).
 								= value * (1023/SINE_TOTAL)
