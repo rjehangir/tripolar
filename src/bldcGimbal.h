@@ -97,7 +97,7 @@ class bldcGimbal
 		uint16_t _speed_rpm;
 			/**< The set speed of the motor in rotations per minute */
 			
-		uint8_t _baseIncrement;
+		int8_t _baseIncrement;
 			/**< This is the amount the motor needs to be incremented every PWM cycle */
 			
 		uint16_t _incrementDelay_100us;  

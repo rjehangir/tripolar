@@ -285,8 +285,17 @@ bool checkISRData(pwmEntry_T  *table);
 			if (incEntry) pwmIsrData.pEntry++; //Go to next entry if the switch told us to.			
 			if (pwmIsrData.pEntry->exitMode != isrExitMode_Loop)
 			{
+				
 				OCR1A = pwmIsrData.pEntry->deltaTime;  //Configure the time of the next interrupt.
-				if (pwmIsrData.pEntry->exitMode  == isrExitMode_Exit) break;				
+				if ( (pwmIsrData.pEntry->deltaTime - TCNT1) < 80 || (pwmIsrData.pEntry->deltaTime - TCNT1) > PWM_CYCLE_CNT)
+				{
+					asm("NOP");
+				}
+				break;		
+				
+				if (pwmIsrData.pEntry->exitMode  == isrExitMode_Exit){
+						
+				}
 				else
 				{					
 					//while (TCNT1 <  pwmIsrData.pEntry->deltaTime ) asm(" ");	//Otherwise, stay in ISR and wait for the next timer expiration.
@@ -420,7 +429,8 @@ bool checkISRData(pwmEntry_T  *table);
 			
 			memcpy((void *)pwmIsrData.tableA,(const void *)pwmInit,sizeof(pwmInit));					
 			for (uint8_t n=0;n<3;n++) _pwmChannel[n].dutyCycle = 0;		
-			_updateOutstanding = false;																			
+			_updateOutstanding = false;	
+																				
 	}
 
 
@@ -633,6 +643,8 @@ bool checkISRData(pwmEntry_T  *table);
 			pIsrScriptEntry++;	
 			pSortEntry = pSortEntry->pNextEntry;					
 		}
+		
+		
 		
 		
 	

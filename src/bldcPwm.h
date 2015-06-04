@@ -286,11 +286,8 @@ class bldcPwm
 			 *		the high end of the range corresponds to 100% duty cycle.							*/
    		    /*------------------------------------------------------------------------------------------*/
 			 { 
-					_pwmChannel[channel].dutyCycle = value;
-				
-					
-			}
-			
+					_pwmChannel[channel].dutyCycle = value;									
+			 }
 			 
 			 bool icr1Conflict(void);
 			/**< Returns true if a timer 1 input compare event occured while the 

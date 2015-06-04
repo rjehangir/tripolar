@@ -207,11 +207,12 @@
 		int32_t numerator = PWM_INCREMENT_SCALER_NUMERATOR;
 		numerator *= speed;
 		numerator *= 1000;
-		uint32_t denomenator = 	PWM_INCREMENT_SCALER_DENOMENATOR;
-		uint32_t calcValue = numerator / denomenator;
+		int32_t denomenator = 	PWM_INCREMENT_SCALER_DENOMENATOR;
+		int32_t calcValue = numerator / denomenator;
 		_baseIncrement = calcValue / 1000;
-		uint32_t remainder = calcValue - ((uint32_t)_baseIncrement *1000);
-		_incrementDelay_100us = 10000 / remainder;				
+		int32_t remainder = calcValue - ((uint32_t)_baseIncrement *1000);
+		_incrementDelay_100us = 10000 / remainder;		
+		//_accumulator = 0;		
 	}
 	
 
@@ -225,7 +226,7 @@
 	{
 				
 		uint16_t pwmA,pwmB,pwmC;
-		uint8_t indexA,indexB,indexC;
+		uint8_t indexA,indexB,indexC;		
 		
 		if (_reverse) _currentStep -= value;
 		else _currentStep += value;
@@ -237,9 +238,13 @@
 		pwmA = sineToDutyCycle(pwmSin[indexA]);
 		pwmB = sineToDutyCycle(pwmSin[indexB]);
 		pwmC = sineToDutyCycle(pwmSin[indexC]);
+		
 			
 		_motorPwm.set_pwm(bldcPwm::ePwmChannel_A,pwmA);
 		_motorPwm.set_pwm(bldcPwm::ePwmChannel_B,pwmB);
 		_motorPwm.set_pwm(bldcPwm::ePwmChannel_C,pwmC);
+		
+		
+		
 		_motorPwm.update();
 	};	

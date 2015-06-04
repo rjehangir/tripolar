@@ -70,7 +70,7 @@
 			portVal = portVal << 2;		
 			PORTC &= ~(DEBUG_MASK_C & ~portVal);
 			PORTC |= portVal;
-		}			
+		}			 
 #else
 	#define DIR_PC (1<<green_led) + (1<<red_led)
 	inline void DEBUG_OUT(uint8_t X) {}
