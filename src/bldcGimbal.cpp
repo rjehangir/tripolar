@@ -191,13 +191,13 @@
 	*	Description:
 	*		See class header file for a full API description of this method
 	****************************************************************************/				 
-	void bldcGimbal::set_speed_rpm(int16_t value)
+	bool bldcGimbal::set_speed_rpm(int16_t value)
 	{						
 		if(value ==0)
 		{
 			_incrementDelay_100us = 0;
 			_baseIncrement = 0;
-			return;
+			return true;
 		}
 		
 		if (value < 0) _reverse = true;
@@ -213,6 +213,7 @@
 		int32_t remainder = calcValue - ((uint32_t)_baseIncrement *1000);
 		_incrementDelay_100us = 10000 / remainder;		
 		//_accumulator = 0;		
+		return true;
 	}
 	
 
@@ -248,3 +249,80 @@
 		
 		_motorPwm.update();
 	};	
+	
+	
+	
+	
+	/****************************************************************************
+	*  Class: bldcGimbal
+	*  Method: set_servo_us
+	*	Description:
+	*		See class header file for a full API description of this method
+	****************************************************************************/	
+	bool bldcGimbal::set_servo_us(int16_t currentServo)
+	{
+	    int16_t currentSpeed = 0;		 //Speed calculated based on the servo value.
+		static int16_t lastServo = 0;	 //The servo value last time this method was called.
+		static int16_t lastServo2 = 0;	 //The servo value 2 calls ago.	
+		
+		#ifdef AVERAGING_ENABLED
+			static int16_t averageSpeed = 0; //Running Average of speed, used for averaging calculation. 
+		#endif
+								
+		//Disregard if this is a rouge point (this is the jitter filter)
+		if(!(abs(currentServo-lastServo)>FILTER_THRESHOLD_US && (abs(lastServo - lastServo2) <= FILTER_OFF_SLOPE_US )))		
+		{						
+			//Disregard if the value was unchanged
+			if (currentServo != lastServo)
+			{
+				//Disregard if the value is out of range
+				if (currentServo < SERVO_MAX_US && currentServo > SERVO_MIN_US)
+				{	
+					/*
+					------------------------------------------------------------------------------------------------
+					 SCALE FROM SERVO TO RPM
+					--------------------------------------------------------------------------------------------------
+					*/						
+					currentSpeed = currentServo - SERVO_CENTER_US;
+					
+					//Choose Correct Sign For Deadzone									
+					int8_t deadZone = (currentSpeed<0? -1 * DEADZONE_US : DEADZONE_US);									
+					
+					//Scale current Speed and adjust for deadzone.
+					currentSpeed = (abs(currentSpeed)<=DEADZONE_US?0:(SPEED_SCALE*((currentSpeed-deadZone)))/10);
+					
+					//Implement Averaging (if enabled)
+					#ifdef AVERAGING_ENABLED
+						currentSpeed = averageSpeed = ((averageSpeed*AVERAGING_RATE) + (currentSpeed*(10-AVERAGING_RATE)))/10;
+					#endif
+						
+					
+					/*
+					------------------------------------------------------------------------------------------------
+					 CALCULATE POWER SCALING 
+					--------------------------------------------------------------------------------------------------
+					*/								
+					uint16_t powerScale1 = POWER_CENTER_OFFSET + ((100/4)*abs(currentSpeed)/(POWER_CENTER_INTERCEPT/4));  
+					uint16_t powerScale2 = POWER_SPEED_OFFSET + ((100/4)*abs(currentSpeed) /(POWER_SPEED_INTERCEPT/4));								
+						 /* The actual equation is :
+						  *	 powerScale = OFFSET + 100 * currentSpeed / INTERCEPT
+						  *	 					
+						  * We need to prevent having a number larger than 65535 during the calculation 
+						  * We will assume that the maximum currentSpeed will be 2000 RPM, we will get a 
+						  * maximum of 100*2000 = 200,000 during calculation. To keep this within range
+						  * we need to pre-divide it by 4 resulting in a max value of 50,000 during calculation.
+						  *--------------------------------------------------------------------------------------------*/
+					set_PowerScale(powerScale1>powerScale2?powerScale2:powerScale1);															
+					
+					
+					set_speed_rpm(currentSpeed);					
+				} //If Value Out Of Range
+			} //If value unchanged
+		}  //If Rouge Point 
+		lastServo = currentServo;
+		lastServo2 = lastServo;
+		return true;
+	} //Method
+		
+		
+	

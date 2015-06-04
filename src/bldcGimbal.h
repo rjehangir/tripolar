@@ -22,7 +22,124 @@
 */
 	#define COIL_RATIO  7  
 				/**< The number of sine cycles each coil needs to go through for motor to 
-				 * make on rotation																				*/
+				 * make on rotation		*/
+	
+	
+				
+	/*
+	---------------------------------------------------------------------------------------------------
+	POWERSCALE SETTINGS
+		The following settings control how we scale the power applied to the motor, relative to the 
+		speed the motor is operating at. The gimbal control method always applies full power to the motor
+		even when the motor is not turning. The power scaling feature allows power to be reduced 
+		at low speeds in order to conserve power consumption. 
+	---------------------------------------------------------------------------------------------------
+	*/
+	
+				
+
+			/*
+			---------------------------------------------------------------------------------------------------		
+			POWER PROFILE LINES
+				The power profile is defined by 2 slopes. The first (POWER_CENTER) is a steep slope used to control 
+				how quickly	the power ramps from 0 to some usable level. The second (POWER_SPEED) is a shallower 
+				slope used to control how power increases as motor speed increases. The system calculates both 
+				curves and then uses the lowest value.
+			---------------------------------------------------------------------------------------------------		
+			*/
+			
+				#define POWER_CENTER_OFFSET 0 
+					/*The is a number between 0 and 100 which control the percent power applied to the motor
+					 *when it is set to 0 RPM */
+					
+				#define POWER_CENTER_INTERCEPT  10
+					/* The RPM the motor will be spinning at when the POWER_CENTER line has reached 100% power. */
+			
+				#define POWER_SPEED_OFFSET  50
+					/* The power which should be applied to the motor after it has completed ramping up from 0 rpm
+					   (using the POWER_CENTER line). This is a number between 0 and 100 which corresponds to the 
+					   percent power.	*/
+				#define POWER_SPEED_INTERCEPT  350
+				   /* The RPM the motor will be spinning at when we reach full power. */
+
+			
+	
+				
+				
+	/*
+	---------------------------------------------------------------------------------------------------
+	SERVO SCALING METHODS
+		The following settings controls how we convert between a servo pulsewidth and the 
+		speed the motor will run at.
+	---------------------------------------------------------------------------------------------------
+	*/
+	
+			/*
+			---------------------------------------------------------------------------------------------------
+			 SERVO RANGING 
+			---------------------------------------------------------------------------------------------------
+			*/	 
+					#define SERVO_MIN_US 1000  
+						/* The minimum valid servo pulse width in uS. Any value below this number will be ignored */
+		
+					#define SERVO_MAX_US 2000
+						/* The maximum valid servo pulse width in uS. Any value above this number will be ignored */
+	
+					#define SERVO_CENTER_US 1500
+						/* Servo pulse width corresponding to the center point. This value will be interpreted as
+						 * zero motor speed. Anything above this number will be positive motor rotation, anything 
+						 * below, negative motor rotation. */
+		
+					#define DEADZONE_US 5
+						/* This defines the "deadzone" at the center of the servo range in micro seconds. 
+						 * Any servo pulse width which is within (+/-) DEADZONE_US of SERVO_CENTER_US will 
+						 * result in zero speed. The speed will then smoothly ramp up from zero upon exiting 
+						 * the deadzone.			*/
+						
+			/*
+			---------------------------------------------------------------------------------------------------
+			 SERVO AVERAGING  
+			---------------------------------------------------------------------------------------------------
+			*/	 
+				
+					#define AVERAGING_ENABLED
+						/* When defined, the average value of the servo pulses, taken over time, will be used
+						 * to determine the motor speed. Comment out this definition to disable averaging. */
+				
+					#define AVERAGING_RATE 7
+						/* The averaging intensity indicated by a number between 0 and 10. 0 Corresponds to no 
+						   averaging, 10 resulting in full averaging (where the number would never change) */
+						
+			/*
+			---------------------------------------------------------------------------------------------------
+			 SERVO SCALING 
+			---------------------------------------------------------------------------------------------------
+			*/	 
+				
+					#define SPEED_SCALE 11
+						/* Controls the ratio of servo pulse width uS to RPM where the ratio is
+						 *			rpm = (SPEED_SCALE /10)* deltaPulseWidth_uS
+						 * where deltaPulseWidth is relative to SERVO_CENTER_US 
+						 * A value of 10 gives a 1 to 1 relationship. 20 give 2 to 1, 5 gives a half. */
+							
+			/*
+			---------------------------------------------------------------------------------------------------
+			 SERVO JITTER FILTERING 
+				The jitter filter looks for rouge spikes which last for only one measurement and disregards them.				
+			---------------------------------------------------------------------------------------------------
+			*/	 	
+					#define FILTER_THRESHOLD_US  25		
+						/* This is the size of a spike in micro seconds. If the current value is more than 
+						   FILTER_THRESHOLD_US from the previous measurement it is considered a spike.	*/
+				    #define FILTER_OFF_SLOPE_US 50 
+						/* If the previous 2 servo measurements were this far apart, then we are assuming that the
+						   servo value is being changed at a fast rate and so we disable the filter. */
+			
+				 
+				 
+	
+	
+	
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& MACROS
@@ -90,6 +207,78 @@ class bldcGimbal
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	*/	public:
 
+		
+	/*
+	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	&&& PUBLIC METHODS
+	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	*/	public:
+	
+			bldcGimbal(void);
+			/**<Instatiator. Called automatically when the class is instantiated. Good place for class
+			 * property initialization																	*/
+			/*------------------------------------------------------------------------------------------*/
+		
+
+			void begin(void);
+			/**< Setup method for class. Call this after the class is instantiated, but before using 
+				* the class.																			*/
+			/*------------------------------------------------------------------------------------------*/
+			
+	
+			 void tickle(void);
+			/**< This function needs to be called on a regular basis to enable the this class to do
+			 * housekeeping. Primarily, this is used to increment the motor at the proper times			 */
+			 /*------------------------------------------------------------------------------------------*/
+			 
+			 
+			 bool set_servo_us(int16_t value);
+			 /**< This method takes a value read from a servo (in microseconds) and performs the scaling 
+			  * and preprocessing to allow this value to control the motor speed. This accepts a range 
+			  * from 1000uS to 2000uS where zero is 1500uS, anything greated than 1500uS is positive motor
+			  * rotation, and anything less than 1500uS is negative motor rotation.
+			  * @param value
+			  *		The servo pulse width measured in microseconds.										
+			  *	@return 
+			  *		True if success, false if failure.							   		     			  */
+			 /*-------------------------------------------------------------------------------------------*/
+
+			/*
+			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+			&&& ACCESSORS
+			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+			*/
+			 
+					inline uint16_t speed_rpm(void){return _speed_rpm;};
+						 /**< Accessor Method. See corresponding private property for more info.				*/
+					inline bldcPwm motorPwm (void){return _motorPwm;} 
+						 /**< Accessor Method. See corresponding private property for more info.				*/
+					inline uint8_t powerScale(void) {return _powerScale;}
+						 /**< Accessor Method. See corresponding private property for more info.				*/
+			/*
+			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+			&&& MUTATORS
+			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+			*/
+								
+					
+						
+					bool set_speed_rpm(int16_t value); 
+						 /**< Mutator Method. See corresponding private property for more info.					*/
+					inline bool set_PowerScale(uint8_t value) 
+						/**< Mutator Method. See corresponding private property for more info.					*/
+					{
+						_powerScale = value;
+						if(_powerScale >100) _powerScale = 100;
+						return true;
+					}
+						 
+
+	/*
+	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	&&& PRIVATE PROPERTIES
+	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	*/	private:
 	
 		bldcPwm _motorPwm;
 			/**< object which allows pwm control of the H bridges */
@@ -122,58 +311,9 @@ class bldcGimbal
 		 uint8_t _powerScale;			
 			/**< A number between 0 and 10 which controls the power output going to the motor. 10 is
 			 * full power, 0 is no power																*/
-		 bool _reverse; //When true the motor goes in reverse, otherwise it goes forward.				*/			
-	/*
-	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	&&& PUBLIC METHODS
-	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	*/	public:
+		 bool _reverse; //When true the motor goes in reverse, otherwise it goes forward.				*/		
 	
-			bldcGimbal(void);
-			/**<Instatiator. Called automatically when the class is instantiated. Good place for class
-			 * property initialization																	*/
-			/*------------------------------------------------------------------------------------------*/
-		
-
-			void begin(void);
-			/**< Setup method for class. Call this after the class is instantiated, but before using 
-				* the class.																			*/
-			/*------------------------------------------------------------------------------------------*/
-			
 	
-			 void tickle(void);
-			/**< This function needs to be called on a regular basis to enable the this class to do
-			 * housekeeping. Primarily, this is used to increment the motor at the proper times			 */
-			 /*------------------------------------------------------------------------------------------*/
-
-			/*
-			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-			&&& ACCESSORS
-			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-			*/
-			 
-					inline uint16_t speed_rpm(void){return _speed_rpm;};
-						 /**< Accessor Method. See corresponding private property for more info.				*/
-					inline bldcPwm motorPwm (void){return _motorPwm;} 
-						 /**< Accessor Method. See corresponding private property for more info.				*/
-					inline uint8_t powerScale(void) {return _powerScale;}
-						 /**< Accessor Method. See corresponding private property for more info.				*/
-			/*
-			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-			&&& MUTATORS
-			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-			*/
-					void set_speed_rpm(int16_t value); 
-						 /**< Mutator Method. See corresponding private property for more info.					*/
-					inline bool set_PowerScale(uint8_t value) 
-						/**< Mutator Method. See corresponding private property for more info.					*/
-					{
-						_powerScale = value;
-						if(_powerScale >100) _powerScale = 100;
-						return true;
-					}
-						 
-
 	/*
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	&&& PRIVATE METHODS
