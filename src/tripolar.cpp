@@ -199,34 +199,47 @@ void loop(void)
 {
 	static int16_t currentSpeed = 0;
 	static int16_t lastServo = 0;
+	static int16_t lastServo2 = 0;
 	int16_t currentServo;
 	static int16_t averageSpeed = 0;
 	
 	
 	if (servo_changed()) 
 	{
+		
 		currentServo = servo_value_uS();	
-		if (abs(currentServo-1500)>1)
+		
+		if(!(abs(currentServo-lastServo)>25 && (abs(lastServo - lastServo2) <= 50 )))
 		{
-			asm("NOP");
-		}	
-		if (currentServo != lastServo)
-		{
-			if (currentServo < 2000 && currentServo > 1000) 
+			
+		
+			if (abs(currentServo-1500)>1)
 			{
-				currentSpeed = (11*(currentServo - 1500))/10;
-				averageSpeed = ((averageSpeed*7) + (currentSpeed*3))/10;
-				lastServo = currentServo;
-				uint8_t powerScale = 1 + (3*abs(currentSpeed) /350);
-				//uint8_t powerScale = 4;
+				asm("NOP");
+			}	
+			if (currentServo != lastServo)
+			{
+				if (currentServo < 2200 && currentServo > 800)								
+				{
+					#define DEADZONE 5
+					currentSpeed = currentServo - 1500;
+					int8_t sign = (currentSpeed<0?-1*DEADZONE:DEADZONE);				
+					currentSpeed = (abs(currentSpeed)<=DEADZONE?0:(11*((currentSpeed-sign)))/10);
+					averageSpeed = ((averageSpeed*7) + (currentSpeed*3))/10;					
+					uint16_t powerScale1 = 0 + (5*abs(currentSpeed));  //100/10 = 2/1
+					uint16_t powerScale2 = 50 + (5*abs(currentSpeed) /30);// 50/300 = 5/40
+					//uint8_t powerScale = 4;
 				
-				gimbal.set_PowerScale(powerScale);
+					gimbal.set_PowerScale(powerScale1>powerScale2?powerScale2:powerScale1);
 				
-			 	gimbal.set_speed_rpm(currentSpeed);		
-				//gimbal.set_speed_rpm(currentSpeed);		
+			 		gimbal.set_speed_rpm(currentSpeed);		
+					//gimbal.set_speed_rpm(currentSpeed);		
+				}
 			}
-		}
-	}
+		} // END if (!abs(currentServo-lastServo)>100)
+		lastServo = currentServo;
+		lastServo2 = lastServo;
+	} //END 	if (servo_changed()) 
 						
 	gimbal.tickle();	
 }

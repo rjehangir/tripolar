@@ -169,7 +169,7 @@ class bldcGimbal
 						/**< Mutator Method. See corresponding private property for more info.					*/
 					{
 						_powerScale = value;
-						if(_powerScale >4) _powerScale = 4;
+						if(_powerScale >100) _powerScale = 100;
 						return true;
 					}
 						 
@@ -190,11 +190,11 @@ class bldcGimbal
 		{
 			#ifndef PWM_SEQUENTIAL
 				#define GENERIC_SCALER 64U
-				return ((uint16_t) _powerScale *( uint16_t)value * (((kDutyCycleFullScale/4) * GENERIC_SCALER) / 255))/ (GENERIC_SCALER);
+				return ((uint16_t) _powerScale *( uint16_t)value * (((kDutyCycleFullScale/100) * GENERIC_SCALER) / 255))/ (GENERIC_SCALER);
 			#else
 				#define GENERIC_SCALER 64U
 				
-				return ((uint16_t) _powerScale * value*(uint16_t)(((kDutyCycleFullScale/4) * GENERIC_SCALER) / SINE_TOTAL))/(GENERIC_SCALER);
+				return ((uint16_t) _powerScale * value*(uint16_t)(((kDutyCycleFullScale/100) * GENERIC_SCALER) / SINE_TOTAL))/(GENERIC_SCALER);
 					/* THE EQUATION IS  
 								value*(255/SINE_TOTAL)*(1023/255).
 								= value * (1023/SINE_TOTAL)
