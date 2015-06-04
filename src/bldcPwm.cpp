@@ -24,7 +24,6 @@
 #include <stdbool.h>
 
 //#define DO_DEBUG
-#include "afro_nfet.h"
 #include "fets.h"
 #include <avr/io.h>
 #include "bldcPwm.h"

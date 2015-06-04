@@ -24,7 +24,6 @@
 #include <avr/io.h>
 #include "bldcGimbal.h"
 
-#include "afro_nfet.h"
 #include "fets.h"
 #include "measureServo.h"
 

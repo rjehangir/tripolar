@@ -142,6 +142,10 @@
       <SubType>compile</SubType>
       <Link>bldcGimbal.h</Link>
     </Compile>
+    <Compile Include="..\src\blue_nfet .h">
+      <SubType>compile</SubType>
+      <Link>blue_nfet .h</Link>
+    </Compile>
     <Compile Include="..\src\fets.h">
       <SubType>compile</SubType>
       <Link>fets.h</Link>
