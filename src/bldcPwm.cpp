@@ -623,14 +623,13 @@ bool checkISRData(pwmEntry_T  *table);
 			if (n!=0){
 				pIsrScriptEntry->command = (pwmCommand_T)pSortEntry->command;
 				pIsrScriptEntry->deltaTime = pSortEntry->absoluteCount - totalTime;
+				totalTime += pIsrScriptEntry->deltaTime;  
 			}
 			
 			if (pIsrScriptEntry->deltaTime <= ISR_LOOP_CNT ) pIsrScriptEntry->exitMode = isrExitMode_Loop;
 			else if (pIsrScriptEntry->deltaTime <= MIN_TIMER_OCR_CNT ) pIsrScriptEntry->exitMode = isrExitMode_Wait;
 			else pIsrScriptEntry->exitMode = isrExitMode_Exit;
-
-					
-			totalTime += pIsrScriptEntry->deltaTime;
+								
 			pIsrScriptEntry++;	
 			pSortEntry = pSortEntry->pNextEntry;					
 		}
