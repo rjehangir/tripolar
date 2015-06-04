@@ -85,7 +85,7 @@ inline void greenOff(){PORTC |= _BV(green_led);}
 /*.MACRO RED_on
 	sbi	DDRC, red_led
 .ENDMACRO
-.MACRO RED_off
+.MACRO RED_off 
 	cbi	DDRC, red_led
 .ENDMACRO
 .MACRO GRN_on
