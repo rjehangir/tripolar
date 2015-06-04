@@ -139,7 +139,9 @@ inline bool servo_changed(void)
 	if (servoIsrData.dataReady)
 	{		
 		if (gimbal.motorPwm().icr1Conflict()) {
+			TIMSK &= ~_BV(TICIE1);
 			servoIsrData.dataReady = false;		
+			TIMSK |= _BV(TICIE1);
 			redOn();				
 		}
 	}						 	
@@ -149,9 +151,12 @@ inline bool servo_changed(void)
 
 inline uint16_t servo_value_uS(void)
 {
-	uint16_t retVal = servoIsrData.stopTimeStamp - servoIsrData.startTimeStamp;
+	TIMSK &= ~_BV(TICIE1);
+	uint16_t retVal = servoIsrData.stopTimeStamp - servoIsrData.startTimeStamp;	
+	TIMSK |= _BV(TICIE1);
 	redOff();	
 	servoIsrData.dataReady = false;
+	
 	return retVal;
 }
 

@@ -52,10 +52,29 @@
 			timerCycles = 0;
 			
 		}		
-		inline uint32_t millis(void){return timer32_ms;}		
+		inline uint32_t millis(void)
+		{
+			TIMSK &= ~_BV(OCIE2); //Set Output compare interrupt		
+			uint32_t retVal = timer32_ms;
+			TIMSK |= _BV(OCIE2); //Set Output compare interrupt		
+			return retVal;
+		}		
 		inline uint16_t micros(void)
 		{
-		    
-			return timer16_us  + (TCNT2) /2;			
+			
+		  // return timer16_us + TCNT2/2;		   		    
+			uint16_t timerCount = TCNT2;
+			TIMSK &= ~_BV(OCIE2); //disable Output compare interrupt			
+			volatile uint16_t usCount = timer16_us;									
+			TIMSK |= _BV(OCIE2); //Set Output compare interrupt		   
+			return usCount  + (timerCount) /2;						
+		}
+		
+		inline uint16_t _100micros(void)
+		{			  
+			  TIMSK &= ~_BV(OCIE2); //Set Output compare interrupt
+			  volatile uint16_t usCount = timer16_us;
+			  TIMSK |= _BV(OCIE2); //Set Output compare interrupt
+			  return usCount/100;
 		}
 #endif

@@ -166,13 +166,13 @@
 	void bldcGimbal::tickle(void)
 	{												
 			_motorPwm.tickle();
-			
+			uint16_t timerVal = _100micros();
 			
 			if (_incrementDelay_100us == 0) _accumulator = 0;
 			else
 			{
-				if (timer16_us/100 - _incrementTimer >= _incrementDelay_100us){
-					_incrementTimer = timer16_us/100;
+				if (timerVal - _incrementTimer >= _incrementDelay_100us){
+					_incrementTimer = timerVal;
 					_accumulator++;
 				}				
 			}
