@@ -1,6 +1,36 @@
 $repeat 1000
 PINB |= 0x01  //Rising edge pulse
-#25600    //1500 uS
+#24000    //1500 uS
 PINB &= 0xFE
 #29601 //18.5 ms
+
+
+
+PINB |= 0x01  //Rising edge pulse
+#24080    //1505 uS
+PINB &= 0xFE
+#29601 //18.5 ms
+
+
+PINB |= 0x01  //Rising edge pulse
+#24160    //1510 uS
+PINB &= 0xFE
+#29601 //18.5 ms
+
+
+
+PINB |= 0x01  //Rising edge pulse
+#24320    //1520 uS
+PINB &= 0xFE
+#29601 //18.5 ms
+
+
+PINB |= 0x01  //Rising edge pulse
+#24640    //1540 uS
+PINB &= 0xFE
+#29601 //18.5 ms
+
+
+
+
 $endrep
