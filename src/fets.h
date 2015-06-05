@@ -5,7 +5,7 @@
 
 // UNCOMMENT ONE OF THESE FILES ONLY DEPENDING ON WHICH ESC YOU ARE USING
 //#include "afro_nfet.h"
-#include "blue_nfet .h"
+#include "blue_nfet.h"
 
 inline void highSideOff() {
 	ApFETOff();

@@ -22,10 +22,9 @@
 */
 	#define COIL_RATIO  7  
 				/**< The number of sine cycles each coil needs to go through for motor to 
-				 * make on rotation		*/
-	
-	
+				 * make on rotation		*/		
 				
+	
 	/*
 	---------------------------------------------------------------------------------------------------
 	POWERSCALE SETTINGS
@@ -35,9 +34,11 @@
 		at low speeds in order to conserve power consumption. 
 	---------------------------------------------------------------------------------------------------
 	*/
-	
-				
-
+			#define POWER_FULL_SCALE 100
+				/*The _PowerScale parameter controls what percentage of power is provided to the coils.
+				  This value sets what number corresponds to 100 percent power. For example, if this
+				  were set to 10, power scale would be specified in a range of 1 to 10. */
+		
 			/*
 			---------------------------------------------------------------------------------------------------		
 			POWER PROFILE LINES
@@ -46,26 +47,20 @@
 				slope used to control how power increases as motor speed increases. The system calculates both 
 				curves and then uses the lowest value.
 			---------------------------------------------------------------------------------------------------		
-			*/
-			
+			*/			
 				#define POWER_CENTER_OFFSET 0 
-					/*The is a number between 0 and 100 which control the percent power applied to the motor
+					/*The is a number between 0 and 10 which control the percent power applied to the motor
 					 *when it is set to 0 RPM */
 					
 				#define POWER_CENTER_INTERCEPT  10
 					/* The RPM the motor will be spinning at when the POWER_CENTER line has reached 100% power. */
 			
-				#define POWER_SPEED_OFFSET  50
+				#define POWER_SPEED_OFFSET  5
 					/* The power which should be applied to the motor after it has completed ramping up from 0 rpm
-					   (using the POWER_CENTER line). This is a number between 0 and 100 which corresponds to the 
+					   (using the POWER_CENTER line). This is a number between 0 and 10 which corresponds to the 
 					   percent power.	*/
 				#define POWER_SPEED_INTERCEPT  350
-				   /* The RPM the motor will be spinning at when we reach full power. */
-
-			
-	
-				
-				
+				   /* The RPM the motor will be spinning at when we reach full power. */		
 	/*
 	---------------------------------------------------------------------------------------------------
 	SERVO SCALING METHODS
@@ -73,7 +68,6 @@
 		speed the motor will run at.
 	---------------------------------------------------------------------------------------------------
 	*/
-	
 			/*
 			---------------------------------------------------------------------------------------------------
 			 SERVO RANGING 
@@ -94,34 +88,29 @@
 						/* This defines the "deadzone" at the center of the servo range in micro seconds. 
 						 * Any servo pulse width which is within (+/-) DEADZONE_US of SERVO_CENTER_US will 
 						 * result in zero speed. The speed will then smoothly ramp up from zero upon exiting 
-						 * the deadzone.			*/
-						
+						 * the deadzone.			*/						
 			/*
 			---------------------------------------------------------------------------------------------------
 			 SERVO AVERAGING  
 			---------------------------------------------------------------------------------------------------
-			*/	 
-				
+			*/	 				
 					#define AVERAGING_ENABLED
 						/* When defined, the average value of the servo pulses, taken over time, will be used
 						 * to determine the motor speed. Comment out this definition to disable averaging. */
 				
 					#define AVERAGING_RATE 7
 						/* The averaging intensity indicated by a number between 0 and 10. 0 Corresponds to no 
-						   averaging, 10 resulting in full averaging (where the number would never change) */
-						
+						   averaging, 10 resulting in full averaging (where the number would never change) */						
 			/*
 			---------------------------------------------------------------------------------------------------
 			 SERVO SCALING 
 			---------------------------------------------------------------------------------------------------
-			*/	 
-				
+			*/	 				
 					#define SPEED_SCALE 11
 						/* Controls the ratio of servo pulse width uS to RPM where the ratio is
 						 *			rpm = (SPEED_SCALE /10)* deltaPulseWidth_uS
 						 * where deltaPulseWidth is relative to SERVO_CENTER_US 
-						 * A value of 10 gives a 1 to 1 relationship. 20 give 2 to 1, 5 gives a half. */
-							
+						 * A value of 10 gives a 1 to 1 relationship. 20 give 2 to 1, 5 gives a half. */							
 			/*
 			---------------------------------------------------------------------------------------------------
 			 SERVO JITTER FILTERING 
@@ -134,12 +123,6 @@
 				    #define FILTER_OFF_SLOPE_US 50 
 						/* If the previous 2 servo measurements were this far apart, then we are assuming that the
 						   servo value is being changed at a fast rate and so we disable the filter. */
-			
-				 
-				 
-	
-	
-	
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 &&& MACROS
@@ -187,6 +170,9 @@
 			   a constant amount. This consistent sum is defined here for use in calculations in 
 			   this class.			*/
 		#endif
+		
+		# define SINE_FULL_SCALE 255
+		/* Full scale value of the sine function (implemented in the Cpp File) */
 		
 /*
 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -336,21 +322,42 @@ class bldcGimbal
 		 * @return
 		 *     A value PWM duty cycle value.														*/
 		/*------------------------------------------------------------------------------------------*/		 
-		{
+		{			
 			#ifndef PWM_SEQUENTIAL
-				#define GENERIC_SCALER 64U
-				return ((uint16_t) _powerScale *( uint16_t)value * (((kDutyCycleFullScale/100) * GENERIC_SCALER) / 255))/ (GENERIC_SCALER);
-			#else
-				#define GENERIC_SCALER 64U
+			
+			/*  The Equation is:
+				(_powerScale * value * kDutyCycleFullScale) / (kFullPowerScale * kSineFullScale) = 
+				(_powerScale * value * 1000) / (100 * 255) = 
+				(_powerScale * value * 10) / 255 = 
+				(_powerScale * value * 2 * 5) / 255 = 
+				(_powerScale * value * 2 ) / 51 				
+				Maximum Value During Calc = (_powerScale * value * 2 ) = 100*255*2 = 51000 < 65536 (16 bit unsigned full scale)
+			*/							
+				return ((uint16_t)_powerScale * (uint16_t)value * 2) /51;
+				#if POWER_FULL_SCALE != 100 || SINE_FULL_SCALE != 255 || kDutyCycleFullScale !=1000
+					#warning Manual Calculation Must Be Redone - POWER_FULL_SCALE, SINE_FULL_SCALE or kDutyCycleFullScale has changed.
+				#endif
 				
-				return ((uint16_t) _powerScale * value*(uint16_t)(((kDutyCycleFullScale/100) * GENERIC_SCALER) / SINE_TOTAL))/(GENERIC_SCALER);
-					/* THE EQUATION IS  
-								value*(255/SINE_TOTAL)*(1023/255).
-								= value * (1023/SINE_TOTAL)
-					 But this requires either 
-				   floating point, or 32 but integer math.  The equation below plays some
-				   tricks to have the precompiler do most of the work, and also to 
-				   limit the work to 1 16bit multiple and 1 16 bit divide.  */				
+
+			#else
+				#define GENERIC_SCALER 64U								
+			/*  The Equation is:
+				(_powerScale * value * kDutyCycleFullScale) / (kFullPowerScale * SINETOTAL) = 
+				(_powerScale * value * 1000) / (100 * 384) = 
+				(_powerScale * value) * 1000 /38400 =
+				_powerScale * value * 2 * 5/ 384 = 
+				((_powerScale * value / 2) * 5) / 96				
+				
+				Maximum Value During Calc = (_powerScale * value / 2) * 5 = 63750 < 65536
+			*/			
+			
+			return ((((uint16_t) _powerScale * value*(uint16_t) / 2) * 5) /96)			
+			#if POWER_FULL_SCALE != 100 || SINETOTAL != 384 || kDutyCycleFullScale !=1000
+				#warning Manual Calculation Must Be Redone - POWER_FULL_SCALE, SINETOTAL or kDutyCycleFullScale has changed.
+			#endif				
+
+				
+				
 			#endif
 		}
 				
