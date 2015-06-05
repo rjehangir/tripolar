@@ -27,10 +27,15 @@
 #define	green_led	2	//; o
 #define rcp_in  0	//i r/c pulse input
 
-#define	INIT_PB	(1<<CpFET)
-#define DIR_PB  (1<<CpFET)
+#define	INIT_PB	0
+#define DIR_PB  (1<<CnFET)+(1<<green_led)+(1<<red_led)
 
 #define	CnFET_port PORTB
+
+inline void redOn(){PORTB &= ~_BV(red_led);}
+inline void redOff(){PORTB |= _BV(red_led);}
+inline void greenOn(){PORTB &= ~_BV(green_led);}
+inline void greenOff(){PORTB |= _BV(green_led);}
 
 //;*********************
 //; PORT C definitions *
@@ -39,7 +44,7 @@
 #define	mux_temperature	6	//; ADC6 temperature input (3.3k from +5V, 10k NTC to gnd)
 #define	i2c_clk		5	//; ADC5/SCL
 #define	i2c_data	4	//; ADC4/SDA
-
+#define mux_current 3
 #define	mux_b		  1	//; ADC1 phase input
 #define	mux_a		  0	//; ADC0 phase input
 
@@ -47,15 +52,9 @@
 #define	O_GROUND	33
 
 #define	INIT_PC		(1<<i2c_clk)+(1<<i2c_data)
+#define DIR_PC    0
 
-#define DIR_PC (1<<green_led) + (1<<red_led)
 inline void DEBUG_OUT(uint8_t X) {}
-
-
-inline void redOn(){PORTB &= ~_BV(red_led);}
-inline void redOff(){PORTB |= _BV(red_led);}
-inline void greenOn(){PORTB &= ~_BV(green_led);}
-inline void greenOff(){PORTB |= _BV(green_led);}
 
 //;*********************
 //; PORT D definitions *
@@ -70,22 +69,14 @@ inline void greenOff(){PORTB |= _BV(green_led);}
 #define	txd		  1
 #define	rxd		  0
 
-
-
-#ifndef DO_DEBUG
-	#define	DIR_PD		(1<<AnFET)+(1<<BnFET)+(1<<CnFET)+(1<<ApFET)+(1<<txd)
-	#define	INIT_PD		(1<<ApFET)+(1<<txd)
-#else
-	#define	DIR_PD		(1<<ApFET) + (1<<AnFET)+(1<<BpFET)+(1<<BnFET)+(1<<CpFET)
-	#define	INIT_PD		(1<<ApFET)+(1<<txd)
-#endif
+#define	INIT_PD		(1<<txd)+(1<<ApFET)+(1<<BpFET)+(1<<CpFET)
+#define	DIR_PD		(1<<AnFET)+(1<<BnFET)+(1<<ApFET)+(1<<BpFET)+(1<<CpFET)+(1<<txd)
 
 #define	ApFET_port	PORTD
 #define	AnFET_port	PORTD
 #define	BpFET_port	PORTD
 #define	BnFET_port	PORTD
 #define	CpFET_port	PORTD
-
 
 inline void ApFETOn()  { ApFET_port &= ~_BV(ApFET);}
 inline void ApFETOff() { ApFET_port |=  _BV(ApFET);}

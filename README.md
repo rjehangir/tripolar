@@ -12,6 +12,10 @@ Additionally, there are many applications that require low-speed, high-torque mo
 
 This firmware runs the brushless motor at high currents for maximum torque. This will quickly overheat and burn out a traditional brushless motor designed for high power outputs. *This firmware should only be used with "gimbal" style brushless motors with phase resistance of 3.5 ohms or greater.*
 
+##Toolchain
+
+Use of this firmware requires a copy of Arduino (ideally Arduino 0022), as well as avr-gcc, cmake, and avrdude.
+
 ##Compilation
 
 This code is written to be Arduino-compatible to make it as easy as possible to compile and flash ESCs.
